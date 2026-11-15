@@ -3,6 +3,24 @@
 Учёт игроков и тренеров, турниры, тренировки, матчи, рейтинги и аналитика.
 Одно ядро и две сборки: консольная и графическая на Qt 6 Widgets.
 
+## Быстрый старт
+
+Сборка GUI (PowerShell, из корня проекта):
+
+```
+& 'C:\Qt\Tools\CMake_64\bin\cmake.exe' --build build
+```
+
+Запуск:
+
+```
+.\build\gui\chessClubGui.exe
+```
+
+Или двойным кликом по `build\gui\chessClubGui.exe` — библиотеки Qt уже разложены рядом.
+
+Если папки `build` ещё нет, сначала выполни конфигурацию из раздела «GUI на Qt 6».
+
 ## Структура
 
 ```
@@ -15,6 +33,7 @@ chessClub/
 │   ├─ CMakeLists.txt
 │   ├─ cppFolder/          реализация GUI: main, mainwindow, chestablemodel, dialogs
 │   └─ hFolder/            заголовки GUI
+├─ build/                  каталог сборки (в .gitignore)
 ├─ club.txt                состояние клуба (машиночитаемое)
 ├─ journal.log             журнал действий
 ├─ report.txt              отчёт для человека
@@ -23,6 +42,17 @@ chessClub/
 
 Правило проекта: реализация — в `cppFolder`, заголовки — в `hFolder`, на любом уровне.
 Ядро (`cppFolder` + `hFolder`) не содержит Qt и собирается отдельно.
+
+## Сборка одной командой
+
+Конфигурация + сборка, PowerShell, из корня проекта:
+
+```
+& 'C:\Qt\Tools\CMake_64\bin\cmake.exe' -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=C:/Qt/6.12.0/mingw_64 -DCMAKE_CXX_COMPILER=C:/Qt/Tools/mingw1310_64/bin/g++.exe -DCMAKE_MAKE_PROGRAM=C:/Qt/Tools/Ninja/ninja.exe -DCMAKE_BUILD_TYPE=Debug
+& 'C:\Qt\Tools\CMake_64\bin\cmake.exe' --build build
+```
+
+Первая строка нужна один раз (или после изменения `CMakeLists.txt`), вторая — при каждой правке кода.
 
 ## Файлы данных
 
@@ -67,21 +97,19 @@ chessClub.exe
 
 Требуется Qt 6.12 с китом MinGW 13.1, CMake и Ninja (всё есть в `C:\Qt\Tools`).
 
-```
-& 'C:\Qt\Tools\CMake_64\bin\cmake.exe' -S . -B build -G Ninja `
-  -DCMAKE_PREFIX_PATH=C:/Qt/6.12.0/mingw_64 `
-  -DCMAKE_CXX_COMPILER=C:/Qt/Tools/mingw1310_64/bin/g++.exe `
-  -DCMAKE_MAKE_PROGRAM=C:/Qt/Tools/Ninja/ninja.exe `
-  -DCMAKE_BUILD_TYPE=Debug
+Полная последовательность с нуля:
 
+```
+& 'C:\Qt\Tools\CMake_64\bin\cmake.exe' -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=C:/Qt/6.12.0/mingw_64 -DCMAKE_CXX_COMPILER=C:/Qt/Tools/mingw1310_64/bin/g++.exe -DCMAKE_MAKE_PROGRAM=C:/Qt/Tools/Ninja/ninja.exe -DCMAKE_BUILD_TYPE=Debug
 & 'C:\Qt\Tools\CMake_64\bin\cmake.exe' --build build
+& 'C:\Qt\6.12.0\mingw_64\bin\windeployqt.exe' '.\build\gui\chessClubGui.exe'
+.\build\gui\chessClubGui.exe
 ```
 
-Исполняемый файл: `build\gui\chessClubGui.exe`.
-Запуск: один раз выполни `windeployqt build\gui\chessClubGui.exe`
-(или запускай из Qt Creator — он подставляет PATH сам).
+`windeployqt` достаточно выполнить один раз (и после смены версии Qt) — он копирует
+библиотеки рядом с `.exe`, чтобы программа запускалась двойным кликом.
 
-В Qt Creator: открыть `CMakeLists.txt`, выбрать кит «Desktop Qt 6.12.0 MinGW 64-bit».
+В Qt Creator: открыть `CMakeLists.txt`, выбрать кит «Desktop Qt 6.12.0 MinGW 64-bit», `Ctrl+R`.
 
 Возможности интерфейса:
 
