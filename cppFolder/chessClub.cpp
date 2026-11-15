@@ -1,6 +1,7 @@
 #include "chessClub.h"
 
 #include <algorithm>
+#include <map>
 #include <stdexcept>
 
 #include "elo.h"
@@ -279,6 +280,68 @@ std::vector<std::shared_ptr<Member>> ChessClub::sortedPlayers(SortKey key, bool 
     }
 
     return result;
+}
+
+std::vector<std::shared_ptr<Match>> ChessClub::matchesOfPlayer(int playerId) const
+{
+    std::vector<std::shared_ptr<Match>> result;
+
+    for (const auto& match : _matches) {
+        if (match->getWhitePlayer()->getId() == playerId
+            || match->getBlackPlayer()->getId() == playerId) {
+            result.push_back(match);
+        }
+    }
+
+    return result;
+}
+
+void ChessClub::renumberIds()
+{
+    std::map<int, int> eventMap;
+
+    std::vector<std::shared_ptr<Event>> events(_events.begin(), _events.end());
+    std::sort(events.begin(), events.end(),
+              [](const std::shared_ptr<Event>& a, const std::shared_ptr<Event>& b) {
+                  return a->getId() < b->getId();
+              });
+
+    int nextEvent = 1;
+    for (const auto& event : events) {
+        eventMap[event->getId()] = nextEvent;
+        event->_id = nextEvent;
+        ++nextEvent;
+    }
+
+    std::vector<std::shared_ptr<Member>> members(_players.begin(), _players.end());
+    std::sort(members.begin(), members.end(),
+              [](const std::shared_ptr<Member>& a, const std::shared_ptr<Member>& b) {
+                  return a->getId() < b->getId();
+              });
+
+    int nextMember = 1;
+    for (const auto& member : members) {
+        member->_id = nextMember;
+        ++nextMember;
+    }
+
+    std::vector<std::shared_ptr<Match>> matches(_matches.begin(), _matches.end());
+    std::sort(matches.begin(), matches.end(),
+              [](const std::shared_ptr<Match>& a, const std::shared_ptr<Match>& b) {
+                  return a->getId() < b->getId();
+              });
+
+    int nextMatch = 1;
+    for (const auto& match : matches) {
+        const int oldTournament = match->getTournamentId();
+        match->_id = nextMatch;
+        ++nextMatch;
+
+        if (oldTournament > 0) {
+            const auto it = eventMap.find(oldTournament);
+            match->setTournamentId(it != eventMap.end() ? it->second : -1);
+        }
+    }
 }
 
 void ChessClub::printAllPlayers() const

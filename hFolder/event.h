@@ -3,6 +3,7 @@
 #include <iostream>
 
 class Event {
+    friend class ChessClub;
 public:
     Event(int id, std::string_view title);
     virtual ~Event() = default;

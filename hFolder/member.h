@@ -5,6 +5,7 @@
 #include "ratings.h"
 
 class Member {
+    friend class ChessClub;
 public:
     Member(int id, std::string_view firstName, std::string_view lastName, std::string_view middleName, const Ratings& ratings, int wins, int draws, int losses);
     virtual ~Member() = default;

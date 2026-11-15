@@ -50,6 +50,16 @@ QVariant ChessTableModel::data(const QModelIndex &index, int role) const
         return index.column() < row.text.size() ? row.text[index.column()] : QString();
     }
     if (role == Qt::TextAlignmentRole) {
+        // Числа по центру, текстовые колонки — по левому краю.
+        const QVariant value = index.column() < row.values.size()
+                                   ? row.values[index.column()]
+                                   : QVariant();
+        const int typeId = value.typeId();
+
+        if (typeId == QMetaType::Int || typeId == QMetaType::LongLong
+            || typeId == QMetaType::Double) {
+            return QVariant(Qt::AlignCenter);
+        }
         return QVariant(Qt::AlignLeft | Qt::AlignVCenter);
     }
 

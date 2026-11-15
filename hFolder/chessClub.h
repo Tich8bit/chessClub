@@ -61,6 +61,13 @@ public:
 
     std::vector<std::shared_ptr<Member>> sortedPlayers(SortKey key, bool ascending = true) const;
 
+    // Все партии участника (в турнирах и вне их).
+    std::vector<std::shared_ptr<Match>> matchesOfPlayer(int playerId) const;
+
+    // Перенумеровывает участников, события и партии как 1..N
+    // и обновляет ссылки (турнир у партии).
+    void renumberIds();
+
     void printAllPlayers() const;
     void printAllEvents() const;
     void printAllMatches() const;

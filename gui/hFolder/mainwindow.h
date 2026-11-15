@@ -24,6 +24,7 @@ public:
 private slots:
     void addPlayer();
     void deletePlayer();
+    void showPlayerHistory();
 
     void addCoach();
     void deleteCoach();
@@ -43,6 +44,7 @@ private slots:
     void makeReport();
 
     void applyTheme(const QString &name);
+    void renumberIds();
 
 private:
     struct Tab {

@@ -277,6 +277,12 @@ void demoReport(const ChessClub &club) {
     }
 }
 
+void demoRenumber(ChessClub &club) {
+    club.renumberIds();
+    logAction("перенумерация ID");
+    cout << "ID перенумерованы: участники, события и партии — 1..N.\n";
+}
+
 } // namespace
 
 int main() {
@@ -303,8 +309,9 @@ int main() {
 
     while (true) {
         cout << "\n1.Игрок 2.Тренер 3.Турнир 4.Тренировка 5.Матч 6.Таблица 7.Сохранить "
-                "8.Показать 9.Удалить 10.Запись на турнир 11.Результат 12.Отчёт 0.Выход\n";
-        int c = inputNumber<int>("Действие: ", 0, 12);
+                "8.Показать 9.Удалить 10.Запись на турнир 11.Результат 12.Отчёт "
+                "13.Перенумеровать 0.Выход\n";
+        int c = inputNumber<int>("Действие: ", 0, 13);
         if (c == 0) break;
 
         try {
@@ -325,6 +332,7 @@ int main() {
             case 10: demoEnroll(club); break;
             case 11: demoSetResult(club); break;
             case 12: demoReport(club); break;
+            case 13: demoRenumber(club); break;
             default: break;
             }
         } catch (const ChessException &e) {

@@ -118,6 +118,9 @@ void MainWindow::buildUi()
         });
     }
 
+    auto *serviceMenu = menuBar()->addMenu("Сервис");
+    serviceMenu->addAction("Перенумеровать ID...", this, &MainWindow::renumberIds);
+
     _tabs = new QTabWidget(this);
     setCentralWidget(_tabs);
 
@@ -129,13 +132,16 @@ void MainWindow::buildUi()
         auto *buttons = new QHBoxLayout;
         auto *add = new QPushButton("Добавить", page);
         auto *remove = new QPushButton("Удалить", page);
+        auto *history = new QPushButton("История матчей", page);
         buttons->addWidget(add);
         buttons->addWidget(remove);
+        buttons->addWidget(history);
         buttons->addStretch();
 
         qobject_cast<QVBoxLayout *>(page->layout())->addLayout(buttons);
         connect(add, &QPushButton::clicked, this, &MainWindow::addPlayer);
         connect(remove, &QPushButton::clicked, this, &MainWindow::deletePlayer);
+        connect(history, &QPushButton::clicked, this, &MainWindow::showPlayerHistory);
 
         _tabs->addTab(page, "Игроки");
     }
@@ -456,6 +462,67 @@ void MainWindow::addPlayer()
     } catch (const ChessException &e) {
         QMessageBox::warning(this, "Ошибка", e.what());
     }
+}
+
+void MainWindow::showPlayerHistory()
+{
+    const int id = selectedId(_playersTab);
+    if (id < 0) {
+        message("Выберите игрока в таблице.");
+        return;
+    }
+
+    auto player = std::dynamic_pointer_cast<Player>(_club->findPlayerById(id));
+    if (!player) {
+        message("Это не игрок.");
+        return;
+    }
+
+    const auto matches = _club->matchesOfPlayer(id);
+
+    QString header = QString("%1 (ID %2)\n"
+                             "В профиле: В/Н/П = %3/%4/%5\n"
+                             "Партий в базе: %6\n\n")
+                         .arg(QString::fromStdString(player->getFullName()))
+                         .arg(id)
+                         .arg(player->getWins())
+                         .arg(player->getDraws())
+                         .arg(player->getLosses())
+                         .arg(matches.size());
+
+    if (matches.empty()) {
+        QMessageBox::information(this, "История матчей",
+                                 header + "В базе нет ни одной партии этого игрока.\n"
+                                          "Показатели В/Н/П взяты из сохранённых данных "
+                                          "(они могли быть внесены вручную или в старой версии программы).");
+        return;
+    }
+
+    QString body;
+    for (const auto &match : matches) {
+        const bool isWhite = match->getWhitePlayer()->getId() == id;
+        auto opponent = isWhite ? match->getBlackPlayer() : match->getWhitePlayer();
+        const auto result = match->getResult();
+
+        QString outcome = "не сыграна";
+        if (result.isPlayed()) {
+            const double score = isWhite ? result.getWhiteScore() : result.getBlackScore();
+            if (score >= 1.0) outcome = "победа";
+            else if (score > 0.0) outcome = "ничья";
+            else outcome = "поражение";
+        }
+
+        body += QString("%1 · %2 · соперник: %3 · %4%5\n")
+                    .arg(QString::fromStdString(match->getDate().toString()))
+                    .arg(isWhite ? "белые" : "чёрные")
+                    .arg(QString::fromStdString(opponent->getFullName()))
+                    .arg(outcome)
+                    .arg(match->getTournamentId() > 0
+                             ? QString(" · турнир %1").arg(match->getTournamentId())
+                             : QString());
+    }
+
+    QMessageBox::information(this, "История матчей", header + body);
 }
 
 void MainWindow::deletePlayer()
@@ -835,4 +902,19 @@ QStatusBar { background-color: #143a5e; color: #cfe2ff; }
     if (statusBar()) {
         statusBar()->showMessage(QString("Тема: %1").arg(name), 3000);
     }
+}
+
+void MainWindow::renumberIds()
+{
+    if (QMessageBox::question(this, "Перенумерация",
+                              "Присвоить участникам, событиям и партиям ID 1..N по возрастанию?\n"
+                              "Ссылки в партиях будут обновлены. Действие необратимо.")
+        != QMessageBox::Yes) {
+        return;
+    }
+
+    _club->renumberIds();
+    logAction("перенумерация ID");
+    refreshAll();
+    statusBar()->showMessage("ID перенумерованы.", 4000);
 }

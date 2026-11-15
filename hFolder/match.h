@@ -7,6 +7,7 @@
 class Player;
 
 class Match {
+    friend class ChessClub;
 public:
     Match(int id, std::shared_ptr<Player> whitePlayer, std::shared_ptr<Player> blackPlayer, const DateTime& date);
     int getId() const;
