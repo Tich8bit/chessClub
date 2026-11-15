@@ -42,6 +42,8 @@ private slots:
     void loadState();
     void makeReport();
 
+    void applyTheme(const QString &name);
+
 private:
     struct Tab {
         ChessTableModel *model = nullptr;

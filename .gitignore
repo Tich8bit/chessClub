@@ -10,3 +10,7 @@ CMakeFiles/
 CMakeCache.txt
 *.ninja
 .vs/
+
+# Рабочие файлы, создаваемые во время работы
+journal.log
+report.txt

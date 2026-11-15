@@ -45,6 +45,10 @@ QVariant ChessTableModel::data(const QModelIndex &index, int role) const
     if (role == SortRole) {
         return index.column() < row.values.size() ? row.values[index.column()] : QVariant();
     }
+    if (role == Qt::ToolTipRole) {
+        // Полный текст в подсказке: длинные ФИО обрезаются в колонке.
+        return index.column() < row.text.size() ? row.text[index.column()] : QString();
+    }
     if (role == Qt::TextAlignmentRole) {
         return QVariant(Qt::AlignLeft | Qt::AlignVCenter);
     }

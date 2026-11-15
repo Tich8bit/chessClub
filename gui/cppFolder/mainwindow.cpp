@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 
 #include <QAction>
+#include <QApplication>
 #include <QDialog>
 #include <QDir>
 #include <QFileInfo>
@@ -11,6 +12,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QSettings>
 #include <QSortFilterProxyModel>
 #include <QStatusBar>
 #include <QTabWidget>
@@ -84,6 +86,10 @@ MainWindow::MainWindow(QWidget *parent)
     }
 
     buildUi();
+
+    QSettings settings("chessClub", "chessClubGui");
+    applyTheme(settings.value("theme", "Светлая").toString());
+
     refreshAll();
 
     statusBar()->showMessage(QString("Клуб: %1 · участников: %2")
@@ -101,6 +107,16 @@ void MainWindow::buildUi()
     fileMenu->addAction("Отчёт", this, &MainWindow::makeReport);
     fileMenu->addSeparator();
     fileMenu->addAction("Выход", this, &QWidget::close);
+
+    auto *viewMenu = menuBar()->addMenu("Вид");
+    auto *themeMenu = viewMenu->addMenu("Тема");
+    const char *themes[] = {"Светлая", "Тёмная", "Синяя"};
+    for (const char *name : themes) {
+        QAction *action = themeMenu->addAction(QString::fromUtf8(name));
+        connect(action, &QAction::triggered, this, [this, name]() {
+            applyTheme(QString::fromUtf8(name));
+        });
+    }
 
     _tabs = new QTabWidget(this);
     setCentralWidget(_tabs);
@@ -226,6 +242,10 @@ QWidget *MainWindow::buildTableTab(Tab &tab, const QStringList &headers)
     connect(tab.filter, &QLineEdit::textChanged, this, [tabPtr](const QString &text) {
         tabPtr->proxy->setFilterFixedString(text);
     });
+
+    // Двойной клик по заголовку — подогнать ширину колонки под содержимое.
+    connect(tab.view->horizontalHeader(), &QHeaderView::sectionDoubleClicked, this,
+            [tabPtr](int column) { tabPtr->view->resizeColumnToContents(column); });
 
     return page;
 }
@@ -763,5 +783,56 @@ void MainWindow::makeReport()
         statusBar()->showMessage("Отчёт записан в report.txt", 4000);
     } catch (const ChessException &e) {
         QMessageBox::warning(this, "Ошибка отчёта", e.what());
+    }
+}
+
+void MainWindow::applyTheme(const QString &name)
+{
+    QSettings("chessClub", "chessClubGui").setValue("theme", name);
+
+    QString style;
+
+    if (name == "Тёмная") {
+        style = R"(
+QWidget { background-color: #1e1e1e; color: #e6e6e6; }
+QMainWindow, QDialog, QMessageBox { background-color: #1e1e1e; }
+QTableView { background-color: #252526; gridline-color: #3c3c3c; selection-background-color: #0e639c; selection-color: #ffffff; }
+QHeaderView::section { background-color: #333337; color: #e6e6e6; border: 1px solid #3c3c3c; padding: 4px; }
+QLineEdit, QSpinBox, QComboBox, QDateEdit, QTimeEdit { background-color: #2d2d30; color: #e6e6e6; border: 1px solid #3c3c3c; padding: 3px; }
+QPushButton { background-color: #333337; border: 1px solid #3c3c3c; padding: 5px 12px; }
+QPushButton:hover { background-color: #3e3e42; }
+QPushButton:pressed { background-color: #0e639c; }
+QTabWidget::pane { border: 1px solid #3c3c3c; }
+QTabBar::tab { background: #2d2d30; color: #e6e6e6; padding: 6px 14px; }
+QTabBar::tab:selected { background: #0e639c; }
+QMenuBar, QMenu { background-color: #2d2d30; color: #e6e6e6; }
+QMenuBar::item:selected, QMenu::item:selected { background: #0e639c; }
+QToolTip { background-color: #2d2d30; color: #e6e6e6; border: 1px solid #3c3c3c; padding: 4px; }
+QStatusBar { background-color: #2d2d30; color: #cfcfcf; }
+)";
+    } else if (name == "Синяя") {
+        style = R"(
+QWidget { background-color: #0f2740; color: #e8f1ff; }
+QMainWindow, QDialog, QMessageBox { background-color: #0f2740; }
+QTableView { background-color: #143a5e; gridline-color: #1f5178; selection-background-color: #2f7bd0; selection-color: #ffffff; }
+QHeaderView::section { background-color: #17466e; color: #e8f1ff; border: 1px solid #1f5178; padding: 4px; }
+QLineEdit, QSpinBox, QComboBox, QDateEdit, QTimeEdit { background-color: #143a5e; color: #e8f1ff; border: 1px solid #1f5178; padding: 3px; }
+QPushButton { background-color: #17466e; border: 1px solid #1f5178; padding: 5px 12px; }
+QPushButton:hover { background-color: #1f5f8f; }
+QPushButton:pressed { background-color: #2f7bd0; }
+QTabWidget::pane { border: 1px solid #1f5178; }
+QTabBar::tab { background: #143a5e; color: #e8f1ff; padding: 6px 14px; }
+QTabBar::tab:selected { background: #2f7bd0; }
+QMenuBar, QMenu { background-color: #143a5e; color: #e8f1ff; }
+QMenuBar::item:selected, QMenu::item:selected { background: #2f7bd0; }
+QToolTip { background-color: #143a5e; color: #e8f1ff; border: 1px solid #1f5178; padding: 4px; }
+QStatusBar { background-color: #143a5e; color: #cfe2ff; }
+)";
+    }
+
+    qApp->setStyleSheet(style);
+
+    if (statusBar()) {
+        statusBar()->showMessage(QString("Тема: %1").arg(name), 3000);
     }
 }
