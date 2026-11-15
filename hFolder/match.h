@@ -15,6 +15,10 @@ public:
     const DateTime& getDate() const;
     MatchResult getResult() const;
     void setResult(MatchResult::Result newResult);
+
+    // Турнир, в рамках которого играется партия (-1 — вне турнира).
+    int getTournamentId() const;
+    void setTournamentId(int tournamentId);
     friend std::ostream& operator<<(std::ostream& os, const Match& m);
 private:
     int _id;
@@ -22,4 +26,5 @@ private:
     std::shared_ptr<Player> _blackPlayer;
     DateTime _date;
     MatchResult _result;
+    int _tournamentId = -1;
 };

@@ -15,12 +15,35 @@ chessClub/
 │   ├─ CMakeLists.txt
 │   ├─ cppFolder/          реализация GUI (main.cpp, mainwindow.cpp, dialogs/, models/)
 │   └─ hFolder/            заголовки GUI (mainwindow.h, dialogs/, models/)
-├─ club.txt                сохранённое состояние клуба
+├─ club.txt                состояние клуба (машиночитаемое)
+├─ journal.log             журнал действий
+├─ report.txt              отчёт для человека
 └─ README.md
 ```
 
 Правило проекта: реализация — в `cppFolder`, заголовки — в `hFolder`, на любом уровне.
 Ядро (`cppFolder` + `hFolder`) не содержит Qt и собирается отдельно.
+
+## Файлы данных
+
+| Файл | Назначение |
+|---|---|
+| `club.txt` | состояние клуба: участники, события, партии, связи. Формат версионирован (`CHESSDB2`), старые файлы читаются |
+| `journal.log` | журнал действий: добавления, удаления, записи на турниры, результаты, сохранения |
+| `report.txt` | отчёт для человека: участники с рейтингами и очками, события, партии, турнирные таблицы |
+
+## Рейтинг Эло
+
+Результат партии пересчитывает рейтинг обоих игроков в дисциплине турнира:
+
+| Контроль | K |
+|---|---|
+| Классика | 20 |
+| Рапид | 30 |
+| Блиц | 40 |
+
+Партия вне турнира считается классической. Повторно записать результат нельзя —
+защита от двойного начисления. Вместе с рейтингом обновляются счётчики побед/ничьих/поражений.
 
 ## Консольная версия
 
@@ -32,32 +55,36 @@ chessClub.exe
 ```
 
 Стартовое меню: `1` — тестовые данные, `2` — загрузка из `club.txt`, `0` — выход.
-Дальше: 1.Игрок 2.Тренер 3.Турнир 4.Тренировка 5.Матч 6.Таблица 7.Сохранить 8.Показать 0.Выход.
+
+Рабочее меню:
+1. Игрок · 2. Тренер · 3. Турнир · 4. Тренировка · 5. Матч · 6. Таблица ·
+7. Сохранить · 8. Показать · 9. Удалить · 10. Запись на турнир · 11. Результат · 12. Отчёт · 0. Выход
+
+Удаление каскадное: игрок убирается из турниров, его партии удаляются.
+Снятие с турнира также удаляет партии этого игрока, чтобы он не «возвращался» в таблицу.
 
 ## GUI на Qt 6
 
 Требуется Qt 6.12 с китом MinGW 13.1, CMake и Ninja (всё есть в `C:\Qt\Tools`).
 
-Конфигурация и сборка (cmd, из корня проекта):
-
 ```
-cmake -S . -B build -G Ninja ^
-  -DCMAKE_PREFIX_PATH=C:/Qt/6.12.0/mingw_64 ^
-  -DCMAKE_CXX_COMPILER=C:/Qt/Tools/mingw1310_64/bin/g++.exe ^
-  -DCMAKE_MAKE_PROGRAM=C:/Qt/Tools/Ninja/ninja.exe ^
+& 'C:\Qt\Tools\CMake_64\bin\cmake.exe' -S . -B build -G Ninja `
+  -DCMAKE_PREFIX_PATH=C:/Qt/6.12.0/mingw_64 `
+  -DCMAKE_CXX_COMPILER=C:/Qt/Tools/mingw1310_64/bin/g++.exe `
+  -DCMAKE_MAKE_PROGRAM=C:/Qt/Tools/Ninja/ninja.exe `
   -DCMAKE_BUILD_TYPE=Debug
 
-cmake --build build
+& 'C:\Qt\Tools\CMake_64\bin\cmake.exe' --build build
 ```
 
 Исполняемый файл: `build\gui\chessClubGui.exe`.
 
-Запуск: рядом с `.exe` нужны библиотеки Qt, поэтому либо запускай из Qt Creator
-(он подставляет PATH сам), либо выполни один раз `windeployqt build\gui\chessClubGui.exe`,
-либо добавь `C:\Qt\6.12.0\mingw_64\bin` в `PATH`.
+Запуск: один раз выполни `windeployqt build\gui\chessClubGui.exe` (или запускай из Qt Creator,
+он подставляет PATH сам).
 
-В Qt Creator проще всего открыть сам `CMakeLists.txt` (File → Open File or Project)
-и выбрать кит «Desktop Qt 6.12.0 MinGW 64-bit».
+В Qt Creator: открыть `CMakeLists.txt`, выбрать кит «Desktop Qt 6.12.0 MinGW 64-bit».
+
+GUI пока в разработке: открывается окно со списком участников.
 
 ## Заметки
 
@@ -65,4 +92,3 @@ cmake --build build
 - Исходники в UTF-8 без BOM; консольная версия выставляет `CP_UTF8`.
 - В коде есть `#include "basefunction.h"`, а файл называется `baseFunction.h`.
   На Windows работает, на Linux/case-sensitive ФС — нет.
-- GUI находится в development-стадии: пока открывается окно со списком игроков.

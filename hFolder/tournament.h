@@ -34,6 +34,11 @@ public:
     Tournament& operator+=(std::shared_ptr<Match> match);
     std::vector<Standing> getStandings(bool useHeadToHead) const;
 
+    bool hasParticipant(int memberId) const;
+    bool removeParticipant(int memberId);
+    bool removeMatch(int matchId);
+    size_t removeMatchesOf(int playerId);
+
 private:
     TimeControl _timeControl;
     std::shared_ptr<TournamentSystem> _system;

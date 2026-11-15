@@ -15,6 +15,9 @@ const DateTime& Match::getDate() const { return _date; }
 MatchResult Match::getResult() const { return _result; }
 void Match::setResult(MatchResult::Result newResult) { _result.setResult(newResult); }
 
+int Match::getTournamentId() const { return _tournamentId; }
+void Match::setTournamentId(int tournamentId) { _tournamentId = tournamentId; }
+
 std::ostream& operator<<(std::ostream& os, const Match& m) {
     os << "ID: " << m._id << " | " << m._date << " | " << m._whitePlayer->getFullName() << " vs " << m._blackPlayer->getFullName() << " | " << m._result;
     return os;

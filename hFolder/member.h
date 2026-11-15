@@ -21,6 +21,10 @@ public:
     int getGamesPlayed() const;
     double getScore() const;
 
+    // Учёт результата партии: 1.0 — победа, 0.5 — ничья, 0.0 — поражение.
+    void recordGame(double score);
+    void setRatings(const Ratings& ratings);
+
     virtual std::string getRole() const = 0;
     virtual double calculateMetric() const = 0;
     virtual std::string getMetricName() const = 0;

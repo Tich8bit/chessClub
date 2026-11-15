@@ -40,6 +40,31 @@ Tournament& Tournament::operator+=(std::shared_ptr<Match> match) {
     return *this;
 }
 
+bool Tournament::hasParticipant(int memberId) const {
+    return _participants.find([memberId](const std::shared_ptr<Member>& p) {
+        return p->getId() == memberId;
+    }) != nullptr;
+}
+
+bool Tournament::removeParticipant(int memberId) {
+    return _participants.removeIf([memberId](const std::shared_ptr<Member>& p) {
+        return p->getId() == memberId;
+    }) > 0;
+}
+
+bool Tournament::removeMatch(int matchId) {
+    return _matches.removeIf([matchId](const std::shared_ptr<Match>& m) {
+        return m->getId() == matchId;
+    }) > 0;
+}
+
+size_t Tournament::removeMatchesOf(int playerId) {
+    return _matches.removeIf([playerId](const std::shared_ptr<Match>& m) {
+        return m->getWhitePlayer()->getId() == playerId
+            || m->getBlackPlayer()->getId() == playerId;
+    });
+}
+
 std::vector<Standing> Tournament::getStandings(bool useHeadToHead) const {
     std::map<std::shared_ptr<Member>, Standing> table;
     for (const auto& p : _participants) table[p] = {p, 0, 0, 0, 0.0};

@@ -1,34 +1,74 @@
 #pragma once
+
+#include <algorithm>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <vector>
+
 #include "collection.h"
-#include "member.h"
 #include "event.h"
 #include "match.h"
+#include "member.h"
+#include "tournament.h"
+
+// Ключ сортировки списка участников.
+enum class SortKey { ById, ByName, ByRating, ByScore };
 
 class ChessClub {
 public:
     explicit ChessClub(std::string_view name);
+
     std::string_view getName() const;
     size_t getPlayerCount() const;
     size_t getEventCount() const;
     size_t getMatchCount() const;
+
     const Collection<Member>& getPlayers() const;
     const Collection<Event>& getEvents() const;
     const Collection<Match>& getMatches() const;
 
+    // Следующий свободный идентификатор.
+    int nextPlayerId() const;
+    int nextEventId() const;
+    int nextMatchId() const;
+
     void addPlayer(std::shared_ptr<Member> player);
     void addEvent(std::shared_ptr<Event> event);
     void addMatch(std::shared_ptr<Match> match);
-    
+
     std::shared_ptr<Member> findPlayerById(int id) const;
     std::shared_ptr<Event> findEventById(int id) const;
+    std::shared_ptr<Match> findMatchById(int id) const;
+    std::shared_ptr<Tournament> findTournamentById(int id) const;
+
+    // Удаление с очисткой связей. Возвращает false, если объекта не было.
+    bool removePlayer(int id);
+    bool removeEvent(int id);
+    bool removeMatch(int id);
+
+    // Запись игрока на турнир и обратно.
+    bool enrollPlayer(int tournamentId, int playerId);
+    bool withdrawPlayer(int tournamentId, int playerId);
+
     void createMatch(int id, std::shared_ptr<Player> white, std::shared_ptr<Player> black, const DateTime& date);
+
+    // Создаёт партию внутри турнира; оба игрока должны быть записаны.
+    bool createMatchInTournament(int matchId, int tournamentId, int whiteId, int blackId, const DateTime& date);
+
+    // Фиксирует результат партии и пересчитывает Эло. Повторно нельзя.
+    bool setMatchResult(int matchId, MatchResult::Result result, int kOverride = 0);
+
+    std::vector<std::shared_ptr<Member>> sortedPlayers(SortKey key, bool ascending = true) const;
 
     void printAllPlayers() const;
     void printAllEvents() const;
     void printAllMatches() const;
+
     ChessClub& operator+=(std::shared_ptr<Member> player);
     ChessClub& operator+=(std::shared_ptr<Event> event);
     ChessClub& operator+=(std::shared_ptr<Match> match);
+
 private:
     std::string _clubName;
     Collection<Member> _players;

@@ -1,35 +1,318 @@
 #include "chessClub.h"
-#include "exceptions/exception.h"
 
-ChessClub::ChessClub(std::string_view name) : _clubName(name) {}
+#include <algorithm>
+#include <stdexcept>
+
+#include "elo.h"
+#include "exceptions/exception.h"
+#include "player.h"
+
+ChessClub::ChessClub(std::string_view name)
+    : _clubName(name)
+{
+}
+
 std::string_view ChessClub::getName() const { return _clubName; }
 size_t ChessClub::getPlayerCount() const { return _players.size(); }
 size_t ChessClub::getEventCount() const { return _events.size(); }
 size_t ChessClub::getMatchCount() const { return _matches.size(); }
+
 const Collection<Member>& ChessClub::getPlayers() const { return _players; }
 const Collection<Event>& ChessClub::getEvents() const { return _events; }
 const Collection<Match>& ChessClub::getMatches() const { return _matches; }
+
+int ChessClub::nextPlayerId() const
+{
+    int maxId = 0;
+    for (const auto& player : _players) {
+        maxId = std::max(maxId, player->getId());
+    }
+    return maxId + 1;
+}
+
+int ChessClub::nextEventId() const
+{
+    int maxId = 0;
+    for (const auto& event : _events) {
+        maxId = std::max(maxId, event->getId());
+    }
+    return maxId + 1;
+}
+
+int ChessClub::nextMatchId() const
+{
+    int maxId = 0;
+    for (const auto& match : _matches) {
+        maxId = std::max(maxId, match->getId());
+    }
+    return maxId + 1;
+}
 
 void ChessClub::addPlayer(std::shared_ptr<Member> player) { _players.add(player); }
 void ChessClub::addEvent(std::shared_ptr<Event> event) { _events.add(event); }
 void ChessClub::addMatch(std::shared_ptr<Match> match) { _matches.add(match); }
 
-std::shared_ptr<Member> ChessClub::findPlayerById(int id) const {
-    return _players.find([id](const std::shared_ptr<Member>& p) { return p->getId() == id; });
+std::shared_ptr<Member> ChessClub::findPlayerById(int id) const
+{
+    return _players.find([id](const std::shared_ptr<Member>& player) {
+        return player->getId() == id;
+    });
 }
 
-std::shared_ptr<Event> ChessClub::findEventById(int id) const {
-    return _events.find([id](const std::shared_ptr<Event>& e) { return e->getId() == id; });
+std::shared_ptr<Event> ChessClub::findEventById(int id) const
+{
+    return _events.find([id](const std::shared_ptr<Event>& event) {
+        return event->getId() == id;
+    });
 }
 
-void ChessClub::createMatch(int id, std::shared_ptr<Player> white, std::shared_ptr<Player> black, const DateTime& date) {
+std::shared_ptr<Match> ChessClub::findMatchById(int id) const
+{
+    return _matches.find([id](const std::shared_ptr<Match>& match) {
+        return match->getId() == id;
+    });
+}
+
+std::shared_ptr<Tournament> ChessClub::findTournamentById(int id) const
+{
+    return std::dynamic_pointer_cast<Tournament>(findEventById(id));
+}
+
+bool ChessClub::removePlayer(int id)
+{
+    if (!findPlayerById(id)) {
+        return false;
+    }
+
+    _players.removeIf([id](const std::shared_ptr<Member>& player) {
+        return player->getId() == id;
+    });
+
+    for (const auto& event : _events) {
+        if (auto tournament = std::dynamic_pointer_cast<Tournament>(event)) {
+            tournament->removeParticipant(id);
+            tournament->removeMatchesOf(id);
+        }
+    }
+
+    _matches.removeIf([id](const std::shared_ptr<Match>& match) {
+        return match->getWhitePlayer()->getId() == id
+            || match->getBlackPlayer()->getId() == id;
+    });
+
+    return true;
+}
+
+bool ChessClub::removeEvent(int id)
+{
+    auto event = findEventById(id);
+    if (!event) {
+        return false;
+    }
+
+    if (auto tournament = std::dynamic_pointer_cast<Tournament>(event)) {
+        std::vector<int> matchIds;
+        for (const auto& match : tournament->getMatches()) {
+            matchIds.push_back(match->getId());
+        }
+        for (int matchId : matchIds) {
+            removeMatch(matchId);
+        }
+    }
+
+    _events.removeIf([id](const std::shared_ptr<Event>& item) {
+        return item->getId() == id;
+    });
+
+    return true;
+}
+
+bool ChessClub::removeMatch(int id)
+{
+    if (!findMatchById(id)) {
+        return false;
+    }
+
+    _matches.removeIf([id](const std::shared_ptr<Match>& match) {
+        return match->getId() == id;
+    });
+
+    for (const auto& event : _events) {
+        if (auto tournament = std::dynamic_pointer_cast<Tournament>(event)) {
+            tournament->removeMatch(id);
+        }
+    }
+
+    return true;
+}
+
+bool ChessClub::enrollPlayer(int tournamentId, int playerId)
+{
+    auto tournament = findTournamentById(tournamentId);
+    if (!tournament) {
+        return false;
+    }
+
+    auto member = findPlayerById(playerId);
+    if (!member || !std::dynamic_pointer_cast<Player>(member)) {
+        return false;
+    }
+
+    if (tournament->hasParticipant(playerId)) {
+        return false;
+    }
+
+    try {
+        *tournament += member;
+    } catch (const ChessException&) {
+        return false;
+    }
+
+    return true;
+}
+
+bool ChessClub::withdrawPlayer(int tournamentId, int playerId)
+{
+    auto tournament = findTournamentById(tournamentId);
+    if (!tournament) {
+        return false;
+    }
+
+    // Партии снявшегося игрока удаляем: иначе он «вернётся» в таблицу через матчи.
+    std::vector<int> matchIds;
+    for (const auto& match : tournament->getMatches()) {
+        if (match->getWhitePlayer()->getId() == playerId
+            || match->getBlackPlayer()->getId() == playerId) {
+            matchIds.push_back(match->getId());
+        }
+    }
+    for (int matchId : matchIds) {
+        removeMatch(matchId);
+    }
+
+    return tournament->removeParticipant(playerId);
+}
+
+void ChessClub::createMatch(int id, std::shared_ptr<Player> white, std::shared_ptr<Player> black, const DateTime& date)
+{
     _matches.add(std::make_shared<Match>(id, white, black, date));
 }
 
-void ChessClub::printAllPlayers() const { std::cout << "\nУчастники:\n"; _players.print(); }
-void ChessClub::printAllEvents() const { std::cout << "\nСобытия:\n"; _events.print(); }
-void ChessClub::printAllMatches() const { std::cout << "\nМатчи:\n"; _matches.print(); }
+bool ChessClub::createMatchInTournament(int matchId, int tournamentId, int whiteId, int blackId, const DateTime& date)
+{
+    auto tournament = findTournamentById(tournamentId);
+    if (!tournament) {
+        return false;
+    }
 
-ChessClub& ChessClub::operator+=(std::shared_ptr<Member> player) { addPlayer(player); return *this; }
-ChessClub& ChessClub::operator+=(std::shared_ptr<Event> event) { addEvent(event); return *this; }
-ChessClub& ChessClub::operator+=(std::shared_ptr<Match> match) { addMatch(match); return *this; }
+    auto white = std::dynamic_pointer_cast<Player>(findPlayerById(whiteId));
+    auto black = std::dynamic_pointer_cast<Player>(findPlayerById(blackId));
+    if (!white || !black || whiteId == blackId) {
+        return false;
+    }
+
+    if (!tournament->hasParticipant(whiteId) || !tournament->hasParticipant(blackId)) {
+        return false;
+    }
+
+    auto match = std::make_shared<Match>(matchId, white, black, date);
+    match->setTournamentId(tournamentId);
+    _matches.add(match);
+    *tournament += match;
+
+    return true;
+}
+
+bool ChessClub::setMatchResult(int matchId, MatchResult::Result result, int kOverride)
+{
+    auto match = findMatchById(matchId);
+    if (!match || match->getResult().isPlayed()) {
+        return false;
+    }
+
+    int k = 20;
+    Elo::Discipline discipline = Elo::Discipline::Classical;
+
+    if (auto tournament = findTournamentById(match->getTournamentId())) {
+        switch (tournament->getTimeControl()) {
+        case Tournament::TimeControl::Blitz:
+            discipline = Elo::Discipline::Blitz;
+            break;
+        case Tournament::TimeControl::Rapid:
+            discipline = Elo::Discipline::Rapid;
+            break;
+        case Tournament::TimeControl::Classic:
+            discipline = Elo::Discipline::Classical;
+            break;
+        }
+        k = Elo::kFactor(static_cast<int>(tournament->getTimeControl()));
+    }
+
+    if (kOverride > 0) {
+        k = kOverride;
+    }
+
+    match->setResult(result);
+    Elo::applyMatch(*match, k, discipline);
+
+    return true;
+}
+
+std::vector<std::shared_ptr<Member>> ChessClub::sortedPlayers(SortKey key, bool ascending) const
+{
+    std::vector<std::shared_ptr<Member>> result(_players.begin(), _players.end());
+
+    const auto comparator = [key](const std::shared_ptr<Member>& lhs,
+                                  const std::shared_ptr<Member>& rhs) {
+        switch (key) {
+        case SortKey::ById:     return lhs->getId() < rhs->getId();
+        case SortKey::ByName:   return lhs->getFullName() < rhs->getFullName();
+        case SortKey::ByRating: return lhs->calculateMetric() < rhs->calculateMetric();
+        case SortKey::ByScore:  return lhs->getScore() < rhs->getScore();
+        }
+        return false;
+    };
+
+    std::sort(result.begin(), result.end(), comparator);
+    if (!ascending) {
+        std::reverse(result.begin(), result.end());
+    }
+
+    return result;
+}
+
+void ChessClub::printAllPlayers() const
+{
+    std::cout << "\nУчастники:\n";
+    _players.print();
+}
+
+void ChessClub::printAllEvents() const
+{
+    std::cout << "\nСобытия:\n";
+    _events.print();
+}
+
+void ChessClub::printAllMatches() const
+{
+    std::cout << "\nМатчи:\n";
+    _matches.print();
+}
+
+ChessClub& ChessClub::operator+=(std::shared_ptr<Member> player)
+{
+    addPlayer(player);
+    return *this;
+}
+
+ChessClub& ChessClub::operator+=(std::shared_ptr<Event> event)
+{
+    addEvent(event);
+    return *this;
+}
+
+ChessClub& ChessClub::operator+=(std::shared_ptr<Match> match)
+{
+    addMatch(match);
+    return *this;
+}

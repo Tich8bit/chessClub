@@ -32,6 +32,16 @@ double Member::getScore() const {
     return (_wins + 0.5 * _draws) / games;
 }
 
+void Member::recordGame(double score) {
+    if (score >= 1.0) ++_wins;
+    else if (score > 0.0) ++_draws;
+    else ++_losses;
+}
+
+void Member::setRatings(const Ratings& ratings) {
+    _ratings = ratings;
+}
+
 std::ostream& operator<<(std::ostream& os, const Member& m) {
     os << "[" << m.getRole() << "] " << m.getFullName() << " | ID: " << m._id << " | Метрика: " << m.calculateMetric();
     m.printInfo(os);
