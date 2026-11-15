@@ -1,6 +1,12 @@
+# Сборка
 *.exe
 *.o
 *.obj
 *.pdb
+*.ilk
 build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+*.ninja
 .vs/
