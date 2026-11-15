@@ -13,8 +13,8 @@ chessClub/
 │   └─ exceptions/         иерархия исключений
 ├─ gui/
 │   ├─ CMakeLists.txt
-│   ├─ cppFolder/          реализация GUI (main.cpp, mainwindow.cpp, dialogs/, models/)
-│   └─ hFolder/            заголовки GUI (mainwindow.h, dialogs/, models/)
+│   ├─ cppFolder/          реализация GUI: main, mainwindow, chestablemodel, dialogs
+│   └─ hFolder/            заголовки GUI
 ├─ club.txt                состояние клуба (машиночитаемое)
 ├─ journal.log             журнал действий
 ├─ report.txt              отчёт для человека
@@ -78,17 +78,26 @@ chessClub.exe
 ```
 
 Исполняемый файл: `build\gui\chessClubGui.exe`.
-
-Запуск: один раз выполни `windeployqt build\gui\chessClubGui.exe` (или запускай из Qt Creator,
-он подставляет PATH сам).
+Запуск: один раз выполни `windeployqt build\gui\chessClubGui.exe`
+(или запускай из Qt Creator — он подставляет PATH сам).
 
 В Qt Creator: открыть `CMakeLists.txt`, выбрать кит «Desktop Qt 6.12.0 MinGW 64-bit».
 
-GUI пока в разработке: открывается окно со списком участников.
+Возможности интерфейса:
+
+- четыре вкладки — «Игроки», «Тренеры», «Турниры», «Матчи»;
+- сортировка кликом по заголовку столбца и фильтр по таблице;
+- добавление и удаление участников, турниров, партий (удаление каскадное);
+- запись игрока на турнир и снятие с него;
+- ввод результата партии с пересчётом Эло;
+- турнирная таблица по кнопке «Таблица»;
+- меню «Файл»: загрузить, сохранить, отчёт.
+
+`club.txt`, `journal.log` и `report.txt` ищутся в текущем каталоге и двумя уровнями выше,
+поэтому GUI корректно работает при запуске из `build\gui`.
 
 ## Заметки
 
-- `club.txt` ищется в текущем каталоге — запускай из корня проекта.
 - Исходники в UTF-8 без BOM; консольная версия выставляет `CP_UTF8`.
 - В коде есть `#include "basefunction.h"`, а файл называется `baseFunction.h`.
   На Windows работает, на Linux/case-sensitive ФС — нет.

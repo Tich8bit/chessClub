@@ -6,7 +6,11 @@ qt_standard_project_setup()
 set(GUI_SOURCES
     cppFolder/main.cpp
     cppFolder/mainwindow.cpp
+    cppFolder/chestablemodel.cpp
+    cppFolder/dialogs.cpp
     hFolder/mainwindow.h
+    hFolder/chestablemodel.h
+    hFolder/dialogs.h
 )
 
 qt_add_executable(chessClubGui ${GUI_SOURCES})
