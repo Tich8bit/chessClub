@@ -128,6 +128,10 @@ void StorageManager::loadState(const std::string& filename, ChessClub& club) {
     for (int i = 0; i < matchesCount; ++i) loadMatch(ifs, club, withExtras);
 
     if (!ifs) throw InvalidDataException("файл повреждён: неожиданный конец данных");
+
+    // Приводим идентификаторы к 1..N и пересчитываем статистику из партий.
+    club.renumberIds();
+    club.recalculateStatistics();
 }
 
 void StorageManager::loadPlayer(std::ifstream& ifs, ChessClub& club) {

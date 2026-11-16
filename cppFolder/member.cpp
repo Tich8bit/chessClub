@@ -42,6 +42,12 @@ void Member::setRatings(const Ratings& ratings) {
     _ratings = ratings;
 }
 
+void Member::resetStatistics() {
+    _wins = 0;
+    _draws = 0;
+    _losses = 0;
+}
+
 std::ostream& operator<<(std::ostream& os, const Member& m) {
     os << "[" << m.getRole() << "] " << m.getFullName() << " | ID: " << m._id << " | Метрика: " << m.calculateMetric();
     m.printInfo(os);

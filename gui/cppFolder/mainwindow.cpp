@@ -68,6 +68,32 @@ QString filePath(const char *name)
     return QDir(stateDirectory()).filePath(QString::fromUtf8(name));
 }
 
+// Тестовая система — для быстрой проверки интерфейса.
+void createTestClub(ChessClub &club)
+{
+    auto p1 = std::make_shared<Player>(1, "Иван", "Иванов", "Иванович", Ratings(1200, 1250, 1300), 0, 0, 0);
+    auto p2 = std::make_shared<Player>(2, "Пётр", "Петров", "Петрович", Ratings(1800, 1750, 1700), 0, 0, 0);
+    auto c1 = std::make_shared<Coach>(3, "Тимофей", "Тренеров", "Тимофеевич",
+                                      Ratings(2000, 1950, 1900), 0, 0, 0, 25,
+                                      Specialization(Specialization::Type::Openings), 4);
+
+    club.addPlayer(p1);
+    club.addPlayer(p2);
+    club.addPlayer(c1);
+
+    auto system = std::make_shared<RoundRobinSystem>(1, true);
+    auto tournament = std::make_shared<Tournament>(
+        1, "Чемпионат", Tournament::TimeControl::Classic, system, 12);
+    *tournament += p1;
+    *tournament += p2;
+    club.addEvent(tournament);
+
+    auto match = std::make_shared<Match>(1, p1, p2, DateTime(1, 11, 2026, 14, 30, 0));
+    match->setTournamentId(1);
+    *tournament += match;
+    club.addMatch(match);
+}
+
 } // namespace
 
 MainWindow::MainWindow(QWidget *parent)
@@ -77,15 +103,30 @@ MainWindow::MainWindow(QWidget *parent)
     setWindowTitle("chessClub");
     resize(1100, 680);
 
-    try {
-        auto loaded = std::make_unique<ChessClub>("Гамбит");
-        StorageManager::loadState(filePath(STATE_FILE).toStdString(), *loaded);
-        _club = std::move(loaded);
-    } catch (const ChessException &) {
-        // Файла ещё нет или он повреждён — начинаем с пустого клуба.
-    }
-
     buildUi();
+
+    QMessageBox startBox(this);
+    startBox.setWindowTitle("chessClub");
+    startBox.setText("Как начать работу?");
+    startBox.setInformativeText("Тестовая система — готовые демо-данные.\n"
+                                "Загрузка — прочитать club.txt.\n"
+                                "Новый клуб — начать с пустого списка.");
+    auto *testButton = startBox.addButton("Тестовая система", QMessageBox::AcceptRole);
+    auto *loadButton = startBox.addButton("Загрузить club.txt", QMessageBox::ActionRole);
+    startBox.addButton("Новый клуб", QMessageBox::RejectRole);
+    startBox.exec();
+
+    if (startBox.clickedButton() == loadButton) {
+        try {
+            auto loaded = std::make_unique<ChessClub>("Гамбит");
+            StorageManager::loadState(filePath(STATE_FILE).toStdString(), *loaded);
+            _club = std::move(loaded);
+        } catch (const ChessException &e) {
+            QMessageBox::warning(this, "Загрузка", e.what());
+        }
+    } else if (startBox.clickedButton() == testButton) {
+        createTestClub(*_club);
+    }
 
     QSettings settings("chessClub", "chessClubGui");
     applyTheme(settings.value("theme", "Светлая").toString());
@@ -117,9 +158,6 @@ void MainWindow::buildUi()
             applyTheme(QString::fromUtf8(name));
         });
     }
-
-    auto *serviceMenu = menuBar()->addMenu("Сервис");
-    serviceMenu->addAction("Перенумеровать ID...", this, &MainWindow::renumberIds);
 
     _tabs = new QTabWidget(this);
     setCentralWidget(_tabs);
@@ -512,14 +550,22 @@ void MainWindow::showPlayerHistory()
             else outcome = "поражение";
         }
 
+        QString tournamentLabel;
+        if (match->getTournamentId() > 0) {
+            if (auto tournament = _club->findTournamentById(match->getTournamentId())) {
+                tournamentLabel = QString(" · турнир: %1")
+                                      .arg(QString::fromStdString(std::string(tournament->getTitle())));
+            } else {
+                tournamentLabel = QString(" · турнир %1").arg(match->getTournamentId());
+            }
+        }
+
         body += QString("%1 · %2 · соперник: %3 · %4%5\n")
                     .arg(QString::fromStdString(match->getDate().toString()))
                     .arg(isWhite ? "белые" : "чёрные")
                     .arg(QString::fromStdString(opponent->getFullName()))
                     .arg(outcome)
-                    .arg(match->getTournamentId() > 0
-                             ? QString(" · турнир %1").arg(match->getTournamentId())
-                             : QString());
+                    .arg(tournamentLabel);
     }
 
     QMessageBox::information(this, "История матчей", header + body);
@@ -902,19 +948,4 @@ QStatusBar { background-color: #143a5e; color: #cfe2ff; }
     if (statusBar()) {
         statusBar()->showMessage(QString("Тема: %1").arg(name), 3000);
     }
-}
-
-void MainWindow::renumberIds()
-{
-    if (QMessageBox::question(this, "Перенумерация",
-                              "Присвоить участникам, событиям и партиям ID 1..N по возрастанию?\n"
-                              "Ссылки в партиях будут обновлены. Действие необратимо.")
-        != QMessageBox::Yes) {
-        return;
-    }
-
-    _club->renumberIds();
-    logAction("перенумерация ID");
-    refreshAll();
-    statusBar()->showMessage("ID перенумерованы.", 4000);
 }

@@ -24,29 +24,29 @@ const Collection<Match>& ChessClub::getMatches() const { return _matches; }
 
 int ChessClub::nextPlayerId() const
 {
-    int maxId = 0;
-    for (const auto& player : _players) {
-        maxId = std::max(maxId, player->getId());
+    int id = 1;
+    while (findPlayerById(id)) {
+        ++id;
     }
-    return maxId + 1;
+    return id;
 }
 
 int ChessClub::nextEventId() const
 {
-    int maxId = 0;
-    for (const auto& event : _events) {
-        maxId = std::max(maxId, event->getId());
+    int id = 1;
+    while (findEventById(id)) {
+        ++id;
     }
-    return maxId + 1;
+    return id;
 }
 
 int ChessClub::nextMatchId() const
 {
-    int maxId = 0;
-    for (const auto& match : _matches) {
-        maxId = std::max(maxId, match->getId());
+    int id = 1;
+    while (findMatchById(id)) {
+        ++id;
     }
-    return maxId + 1;
+    return id;
 }
 
 void ChessClub::addPlayer(std::shared_ptr<Member> player) { _players.add(player); }
@@ -101,6 +101,7 @@ bool ChessClub::removePlayer(int id)
             || match->getBlackPlayer()->getId() == id;
     });
 
+    recalculateStatistics();
     return true;
 }
 
@@ -125,6 +126,7 @@ bool ChessClub::removeEvent(int id)
         return item->getId() == id;
     });
 
+    recalculateStatistics();
     return true;
 }
 
@@ -144,6 +146,7 @@ bool ChessClub::removeMatch(int id)
         }
     }
 
+    recalculateStatistics();
     return true;
 }
 
@@ -255,8 +258,25 @@ bool ChessClub::setMatchResult(int matchId, MatchResult::Result result, int kOve
 
     match->setResult(result);
     Elo::applyMatch(*match, k, discipline);
+    recalculateStatistics();
 
     return true;
+}
+
+void ChessClub::recalculateStatistics()
+{
+    for (const auto& member : _players) {
+        member->resetStatistics();
+    }
+
+    for (const auto& match : _matches) {
+        const auto result = match->getResult();
+        if (!result.isPlayed()) {
+            continue;
+        }
+        match->getWhitePlayer()->recordGame(result.getWhiteScore());
+        match->getBlackPlayer()->recordGame(result.getBlackScore());
+    }
 }
 
 std::vector<std::shared_ptr<Member>> ChessClub::sortedPlayers(SortKey key, bool ascending) const

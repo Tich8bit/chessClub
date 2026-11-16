@@ -44,7 +44,6 @@ private slots:
     void makeReport();
 
     void applyTheme(const QString &name);
-    void renumberIds();
 
 private:
     struct Tab {

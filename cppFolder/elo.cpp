@@ -84,7 +84,4 @@ void Elo::applyMatch(Match& match, int k, Discipline discipline)
 
     white->setRatings(withDelta(whiteRatings, discipline, whiteDelta));
     black->setRatings(withDelta(blackRatings, discipline, blackDelta));
-
-    white->recordGame(whiteScore);
-    black->recordGame(blackScore);
 }

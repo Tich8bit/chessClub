@@ -68,6 +68,9 @@ public:
     // и обновляет ссылки (турнир у партии).
     void renumberIds();
 
+    // Пересчитывает В/Н/П по сыгранным партиям (партии — источник правды).
+    void recalculateStatistics();
+
     void printAllPlayers() const;
     void printAllEvents() const;
     void printAllMatches() const;
