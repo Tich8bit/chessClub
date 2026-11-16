@@ -898,10 +898,6 @@ void MainWindow::playMatch()
         message("У этой партии нет истории ходов (она импортирована из старого формата).");
         return;
     }
-    if (match->getResult().isPlayed()) {
-        message("Партия уже завершена — результат записан.");
-        return;
-    }
 
     GameDialog dialog(_club.get(), id, this);
     dialog.exec();

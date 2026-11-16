@@ -20,6 +20,10 @@ public:
     void setLastMove(int from, int to);
     void setCheckSquare(int square);
 
+    // Ориентация: false — белые снизу, true — белые сверху.
+    void setFlipped(bool flipped);
+    bool isFlipped() const;
+
     QSize sizeHint() const override;
 
 signals:
@@ -33,11 +37,13 @@ private:
     int squareAt(const QPoint &point) const;
     int cellSize() const;
     QRect cellRect(int square) const;
+    void displayCoords(int square, int &column, int &row) const;
 
     ChessGame *_game = nullptr;
     int _selected = -1;
     int _lastFrom = -1;
     int _lastTo = -1;
     int _check = -1;
+    bool _flipped = false;
     QSet<int> _targets;
 };

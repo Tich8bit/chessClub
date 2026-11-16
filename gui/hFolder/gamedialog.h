@@ -13,6 +13,7 @@ class QListWidget;
 class QPushButton;
 
 // Окно партии: доска, список ходов, управление.
+// Если партия не завершена — можно ходить; если завершена — только просмотр.
 class GameDialog : public QDialog
 {
     Q_OBJECT
@@ -26,14 +27,30 @@ private slots:
     void resign();
     void drawAgree();
 
+    void toStart();
+    void stepBack();
+    void stepForward();
+    void toEnd();
+
+    void onMoveActivated(int row);
+    void orientWhiteBottom();
+    void orientBlackBottom();
+
 private:
+    void rebuildView();
     void refresh();
     void clearSelection();
     QString askPromotion() const;
+    void updateNavigation();
 
     ChessClub *_club = nullptr;
     int _matchId = -1;
-    std::shared_ptr<ChessGame> _game;
+    bool _editable = false;
+    bool _flipped = false;
+    int _ply = 0;
+
+    std::shared_ptr<ChessGame> _game;      // настоящая партия
+    std::shared_ptr<ChessGame> _viewGame;  // позиция для показа
 
     ChessBoardWidget *_board = nullptr;
     QListWidget *_moveList = nullptr;
@@ -41,6 +58,10 @@ private:
     QPushButton *_undoButton = nullptr;
     QPushButton *_resignButton = nullptr;
     QPushButton *_drawButton = nullptr;
+    QPushButton *_startButton = nullptr;
+    QPushButton *_prevButton = nullptr;
+    QPushButton *_nextButton = nullptr;
+    QPushButton *_endButton = nullptr;
 
     int _selected = -1;
     QSet<int> _targets;

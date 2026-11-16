@@ -16,7 +16,7 @@ const QColor DARK_SQUARE(181, 136, 99);
 const QColor SELECTED(255, 235, 59, 140);
 const QColor TARGET(60, 160, 90, 150);
 const QColor LAST_MOVE(205, 210, 110, 110);
-const QColor CHECK(220, 60, 60, 150);
+const QColor CHECK(220, 60, 60, 160);
 
 QString glyphFor(char piece)
 {
@@ -37,9 +37,8 @@ QString glyphFor(char piece)
 ChessBoardWidget::ChessBoardWidget(QWidget *parent)
     : QWidget(parent)
 {
-    setMinimumSize(380, 380);
+    setMinimumSize(400, 400);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    setMouseTracking(true);
 }
 
 void ChessBoardWidget::setGame(ChessGame *game)
@@ -73,14 +72,34 @@ void ChessBoardWidget::setCheckSquare(int square)
     update();
 }
 
+void ChessBoardWidget::setFlipped(bool flipped)
+{
+    _flipped = flipped;
+    update();
+}
+
+bool ChessBoardWidget::isFlipped() const
+{
+    return _flipped;
+}
+
 QSize ChessBoardWidget::sizeHint() const
 {
-    return QSize(560, 560);
+    return QSize(640, 640);
 }
 
 int ChessBoardWidget::cellSize() const
 {
     return std::max(1, std::min(width(), height()) / 8);
+}
+
+void ChessBoardWidget::displayCoords(int square, int &column, int &row) const
+{
+    const int file = square % 8;
+    const int rank = square / 8;
+
+    column = _flipped ? 7 - file : file;
+    row = _flipped ? rank : 7 - rank;
 }
 
 QRect ChessBoardWidget::cellRect(int square) const
@@ -89,10 +108,11 @@ QRect ChessBoardWidget::cellRect(int square) const
     const int offsetX = (width() - cell * 8) / 2;
     const int offsetY = (height() - cell * 8) / 2;
 
-    const int file = square % 8;
-    const int rank = square / 8;
+    int column = 0;
+    int row = 0;
+    displayCoords(square, column, row);
 
-    return QRect(offsetX + file * cell, offsetY + (7 - rank) * cell, cell, cell);
+    return QRect(offsetX + column * cell, offsetY + row * cell, cell, cell);
 }
 
 int ChessBoardWidget::squareAt(const QPoint &point) const
@@ -104,12 +124,15 @@ int ChessBoardWidget::squareAt(const QPoint &point) const
     const int x = point.x() - offsetX;
     const int y = point.y() - offsetY;
 
-    if (x < 0 || y < 0 || x >= cell * 8 || y >= cell * 8) {
+    if (cell <= 0 || x < 0 || y < 0 || x >= cell * 8 || y >= cell * 8) {
         return -1;
     }
 
-    const int file = x / cell;
-    const int rank = 7 - (y / cell);
+    const int column = x / cell;
+    const int row = y / cell;
+
+    const int file = _flipped ? 7 - column : column;
+    const int rank = _flipped ? row : 7 - row;
 
     return rank * 8 + file;
 }
@@ -133,7 +156,9 @@ void ChessBoardWidget::paintEvent(QPaintEvent *)
 
     for (int square = 0; square < 64; ++square) {
         const QRect rect = cellRect(square);
-        const bool light = ((square % 8) + (square / 8)) % 2 == 1;
+        const int file = square % 8;
+        const int rank = square / 8;
+        const bool light = (file + rank) % 2 == 1;
         painter.fillRect(rect, light ? LIGHT_SQUARE : DARK_SQUARE);
     }
 
@@ -150,27 +175,36 @@ void ChessBoardWidget::paintEvent(QPaintEvent *)
         painter.fillRect(cellRect(_selected), SELECTED);
     }
 
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(TARGET);
     for (int square : _targets) {
         const QRect rect = cellRect(square);
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(TARGET);
-        painter.drawEllipse(rect.center(), cell / 6, cell / 6);
+        painter.drawEllipse(rect.center(), cell / 7, cell / 7);
     }
     painter.setBrush(Qt::NoBrush);
 
-    // Координаты по краям.
+    // Координаты — внутри крайних клеток, чтобы доска не съезжала.
     QFont coordFont = painter.font();
     coordFont.setPixelSize(std::max(9, cell / 4));
+    coordFont.setBold(true);
     painter.setFont(coordFont);
 
-    for (int i = 0; i < 8; ++i) {
-        const QRect leftRect(offsetX - cell / 2, offsetY + i * cell, cell / 2, cell);
-        painter.setPen(LIGHT_SQUARE);
-        painter.drawText(leftRect, Qt::AlignCenter, QString::number(8 - i));
+    for (int column = 0; column < 8; ++column) {
+        const QRect rect(offsetX + column * cell, offsetY + 7 * cell, cell, cell);
+        const int file = _flipped ? 7 - column : column;
+        const QColor color = (file + ( _flipped ? 7 : 0)) % 2 == 1 ? DARK_SQUARE : LIGHT_SQUARE;
+        painter.setPen(color);
+        painter.drawText(rect.adjusted(4, 0, -4, -2), Qt::AlignRight | Qt::AlignBottom,
+                         QString(QChar('a' + file)));
+    }
 
-        const QRect bottomRect(offsetX + i * cell, offsetY + cell * 8, cell, cell / 2);
-        painter.setPen(LIGHT_SQUARE);
-        painter.drawText(bottomRect, Qt::AlignCenter, QString(QChar('a' + i)));
+    for (int row = 0; row < 8; ++row) {
+        const QRect rect(offsetX, offsetY + row * cell, cell, cell);
+        const int rank = _flipped ? row : 7 - row;
+        const QColor color = (rank + 0) % 2 == 1 ? LIGHT_SQUARE : DARK_SQUARE;
+        painter.setPen(color);
+        painter.drawText(rect.adjusted(4, 2, -4, 0), Qt::AlignLeft | Qt::AlignTop,
+                         QString::number(rank + 1));
     }
 
     if (!_game) {
