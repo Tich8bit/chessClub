@@ -10,7 +10,7 @@ void RoundRobinSystem::validateRules(int maxPlayers) const { if (maxPlayers < 3)
 SwissSystem::SwissSystem(int roundsCount, bool avoidRematches) : _roundsCount(roundsCount), _avoidRematches(avoidRematches) {}
 std::string SwissSystem::getName() const { return "Швейцарская"; }
 int SwissSystem::getTypeId() const { return 1; }
-int SwissSystem::calculateOptimalRounds(int maxPlayers) const { return _roundsCount; }
+int SwissSystem::calculateOptimalRounds(int maxPlayers) const { (void)maxPlayers; return _roundsCount; }
 void SwissSystem::validateRules(int maxPlayers) const { if (maxPlayers < 3) throw InvalidDataException("минимум 3 игрока"); }
 
 KnockoutSystem::KnockoutSystem(bool hasThirdPlaceMatch) : _hasThirdPlaceMatch(hasThirdPlaceMatch) {}

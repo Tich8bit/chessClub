@@ -59,6 +59,33 @@ GameDialog::GameDialog(ChessClub *club, int matchId, QWidget *parent)
     setWindowTitle(QString("Партия #%1").arg(matchId));
     resize(1080, 760);
 
+    // Оформление в духе chess.com: тёмная панель и зелёные кнопки.
+    setStyleSheet(R"(
+QDialog { background-color: #312e2b; }
+QPushButton {
+    background-color: #81b64c;
+    color: #ffffff;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 14px;
+}
+QPushButton:hover { background-color: #9bd05d; }
+QPushButton:pressed { background-color: #6fa23f; }
+QPushButton:disabled { background-color: #3f4650; color: #9aa0a6; }
+QListWidget {
+    background-color: #262421;
+    color: #e8e8e8;
+    border: 1px solid #3a3835;
+    border-radius: 6px;
+}
+QLabel { color: #e8e8e8; }
+QMenuBar { background-color: #262421; color: #e8e8e8; }
+QMenuBar::item:selected { background-color: #81b64c; }
+QMenu { background-color: #262421; color: #e8e8e8; }
+QMenu::item:selected { background-color: #81b64c; }
+)");
+
     auto *menuBar = new QMenuBar(this);
     auto *viewMenu = menuBar->addMenu("Вид");
     auto *group = new QActionGroup(this);

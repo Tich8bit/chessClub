@@ -22,6 +22,10 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow() override;
 
+    // -1 — окно закрыто, 0 — новый клуб, 1 — загрузка, 2 — тестовая система.
+    static int startupChoice();
+    void applyStartup(int mode);
+
 private slots:
     void addPlayer();
     void deletePlayer();

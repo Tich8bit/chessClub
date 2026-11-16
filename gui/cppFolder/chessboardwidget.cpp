@@ -4,6 +4,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QTransform>
 
 #include <algorithm>
 
@@ -229,11 +230,22 @@ void ChessBoardWidget::paintEvent(QPaintEvent *)
         const bool white = piece >= 'A' && piece <= 'Z';
         const QRect rect = cellRect(square);
 
+        // Центрируем глиф по его реальным границам, а не по метрикам шрифта:
+        // иначе фигуры выглядят смещёнными внутри клетки.
         QPainterPath path;
-        path.addText(rect.center().x(), rect.center().y() + cell * 0.30, pieceFont, glyph);
+        path.addText(0, 0, pieceFont, glyph);
 
-        painter.setPen(QPen(white ? QColor(40, 40, 40) : QColor(235, 235, 235), 1.2));
-        painter.setBrush(white ? QColor(250, 250, 250) : QColor(30, 30, 30));
-        painter.drawPath(path);
+        const QRectF bounds = path.boundingRect();
+        const qreal maxSide = std::max(bounds.width(), bounds.height());
+        const qreal scale = maxSide > 0.0 ? std::min<qreal>(1.0, (cell * 0.84) / maxSide) : 1.0;
+
+        QTransform transform;
+        transform.translate(rect.center().x(), rect.center().y());
+        transform.scale(scale, scale);
+        transform.translate(-bounds.center().x(), -bounds.center().y());
+
+        painter.setPen(QPen(white ? QColor(35, 35, 35) : QColor(240, 240, 240), 1.4));
+        painter.setBrush(white ? QColor(252, 252, 252) : QColor(28, 28, 28));
+        painter.drawPath(transform.map(path));
     }
 }

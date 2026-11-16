@@ -66,6 +66,7 @@ size_t Tournament::removeMatchesOf(int playerId) {
 }
 
 std::vector<Standing> Tournament::getStandings(bool useHeadToHead) const {
+    (void)useHeadToHead;  // личные встречи пока не учитываются
     std::map<std::shared_ptr<Member>, Standing> table;
     for (const auto& p : _participants) table[p] = {p, 0, 0, 0, 0.0};
 

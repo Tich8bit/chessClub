@@ -107,29 +107,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     buildUi();
 
-    QMessageBox startBox(this);
-    startBox.setWindowTitle("chessClub");
-    startBox.setText("Как начать работу?");
-    startBox.setInformativeText("Тестовая система — готовые демо-данные.\n"
-                                "Загрузка — прочитать club.txt.\n"
-                                "Новый клуб — начать с пустого списка.");
-    auto *testButton = startBox.addButton("Тестовая система", QMessageBox::AcceptRole);
-    auto *loadButton = startBox.addButton("Загрузить club.txt", QMessageBox::ActionRole);
-    startBox.addButton("Новый клуб", QMessageBox::RejectRole);
-    startBox.exec();
-
-    if (startBox.clickedButton() == loadButton) {
-        try {
-            auto loaded = std::make_unique<ChessClub>("Гамбит");
-            StorageManager::loadState(filePath(STATE_FILE).toStdString(), *loaded);
-            _club = std::move(loaded);
-        } catch (const ChessException &e) {
-            QMessageBox::warning(this, "Загрузка", e.what());
-        }
-    } else if (startBox.clickedButton() == testButton) {
-        createTestClub(*_club);
-    }
-
     QSettings settings("chessClub", "chessClubGui");
     applyTheme(settings.value("theme", "Светлая").toString());
 
@@ -141,6 +118,45 @@ MainWindow::MainWindow(QWidget *parent)
 }
 
 MainWindow::~MainWindow() = default;
+
+int MainWindow::startupChoice()
+{
+    QMessageBox box;
+    box.setWindowTitle("chessClub");
+    box.setText("Как начать работу?");
+    box.setInformativeText("Тестовая система — готовые демо-данные.\n"
+                           "Загрузка — прочитать club.txt.\n"
+                           "Новый клуб — начать с пустого списка.");
+
+    auto *testButton = box.addButton("Тестовая система", QMessageBox::AcceptRole);
+    auto *loadButton = box.addButton("Загрузить club.txt", QMessageBox::ActionRole);
+    auto *newButton = box.addButton("Новый клуб", QMessageBox::RejectRole);
+    box.exec();
+
+    if (box.clickedButton() == testButton) return 2;
+    if (box.clickedButton() == loadButton) return 1;
+    if (box.clickedButton() == newButton) return 0;
+
+    // Окно закрыли крестиком — приложение должно выйти.
+    return -1;
+}
+
+void MainWindow::applyStartup(int mode)
+{
+    if (mode == 1) {
+        try {
+            auto loaded = std::make_unique<ChessClub>("Гамбит");
+            StorageManager::loadState(filePath(STATE_FILE).toStdString(), *loaded);
+            _club = std::move(loaded);
+        } catch (const ChessException &e) {
+            QMessageBox::warning(this, "Загрузка", e.what());
+        }
+    } else if (mode == 2) {
+        createTestClub(*_club);
+    }
+
+    refreshAll();
+}
 
 void MainWindow::buildUi()
 {
