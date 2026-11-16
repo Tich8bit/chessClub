@@ -13,7 +13,10 @@ file(GLOB CORE_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/cppFolder/
 list(REMOVE_ITEM CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cppFolder/main.cpp")
 
 add_library(chessCore STATIC ${CORE_SOURCES})
-target_include_directories(chessCore PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/hFolder")
+target_include_directories(chessCore
+    PUBLIC  "${CMAKE_CURRENT_SOURCE_DIR}/hFolder"
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third_party"
+)
 
 # ---------------------------------------------------------------
 #  Консольная версия
