@@ -1,5 +1,7 @@
 #include "chessgame.h"
 
+#include <cctype>
+
 #include "chess.hpp"
 
 struct ChessGame::Impl {
@@ -182,6 +184,43 @@ std::vector<std::string> ChessGame::legalMoves() const
 const std::vector<std::string>& ChessGame::history() const
 {
     return _impl->uciMoves;
+}
+
+char ChessGame::pieceAt(int square) const
+{
+    if (square < 0 || square >= 64) {
+        return '.';
+    }
+
+    const auto piece = _impl->board.at(chess::Square(square));
+    if (piece == chess::Piece::NONE) {
+        return '.';
+    }
+
+    const int type = static_cast<int>(piece.type());
+    char c = '?';
+
+    if (type == static_cast<int>(chess::PieceType::PAWN))        c = 'p';
+    else if (type == static_cast<int>(chess::PieceType::KNIGHT)) c = 'n';
+    else if (type == static_cast<int>(chess::PieceType::BISHOP)) c = 'b';
+    else if (type == static_cast<int>(chess::PieceType::ROOK))   c = 'r';
+    else if (type == static_cast<int>(chess::PieceType::QUEEN))  c = 'q';
+    else if (type == static_cast<int>(chess::PieceType::KING))   c = 'k';
+    else                                                         return '.';
+
+    return piece.color() == chess::Color::WHITE ? static_cast<char>(std::toupper(c)) : c;
+}
+
+int ChessGame::kingSquare(bool white) const
+{
+    for (int square = 0; square < 64; ++square) {
+        const auto piece = _impl->board.at(chess::Square(square));
+        if (piece != chess::Piece::NONE && piece.type() == chess::PieceType::KING
+            && piece.color() == (white ? chess::Color::WHITE : chess::Color::BLACK)) {
+            return square;
+        }
+    }
+    return -1;
 }
 
 bool ChessGame::replay(const std::vector<std::string>& moves)

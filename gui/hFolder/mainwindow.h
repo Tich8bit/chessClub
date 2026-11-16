@@ -37,6 +37,7 @@ private slots:
     void showStandings();
 
     void addMatch();
+    void playMatch();
     void setMatchResult();
     void deleteMatch();
 

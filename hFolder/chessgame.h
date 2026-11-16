@@ -47,6 +47,10 @@ public:
     std::vector<std::string> legalMoves() const;
     const std::vector<std::string>& history() const;
 
+    // Для интерфейса: фигура на клетке ('P','n','.' — пусто) и позиция короля.
+    char pieceAt(int square) const;
+    int kingSquare(bool white) const;
+
     // Восстановление партии из сохранённых ходов.
     bool replay(const std::vector<std::string>& moves);
 

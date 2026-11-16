@@ -67,6 +67,7 @@ public:
     bool playMove(int matchId, const std::string& uci);
     bool resignMatch(int matchId, bool whiteSide);
     bool agreeDraw(int matchId);
+    bool undoMove(int matchId);
 
     std::vector<std::shared_ptr<Member>> sortedPlayers(SortKey key, bool ascending = true) const;
 

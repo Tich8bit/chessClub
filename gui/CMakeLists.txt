@@ -8,9 +8,13 @@ set(GUI_SOURCES
     cppFolder/mainwindow.cpp
     cppFolder/chestablemodel.cpp
     cppFolder/dialogs.cpp
+    cppFolder/chessboardwidget.cpp
+    cppFolder/gamedialog.cpp
     hFolder/mainwindow.h
     hFolder/chestablemodel.h
     hFolder/dialogs.h
+    hFolder/chessboardwidget.h
+    hFolder/gamedialog.h
 )
 
 qt_add_executable(chessClubGui ${GUI_SOURCES})

@@ -354,6 +354,16 @@ bool ChessClub::agreeDraw(int matchId)
     return true;
 }
 
+bool ChessClub::undoMove(int matchId)
+{
+    auto match = findMatchById(matchId);
+    if (!match || !match->hasGame() || match->getResult().isPlayed()) {
+        return false;
+    }
+
+    return match->game()->undoMove();
+}
+
 void ChessClub::recalculateStatistics()
 {
     for (const auto& member : _players) {

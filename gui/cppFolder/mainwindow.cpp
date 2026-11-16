@@ -29,6 +29,7 @@
 #include "dialogs.h"
 #include "exceptions/exception.h"
 #include "files.h"
+#include "gamedialog.h"
 #include "match.h"
 #include "player.h"
 #include "specialization.h"
@@ -259,15 +260,18 @@ void MainWindow::buildUi()
 
         auto *buttons = new QHBoxLayout;
         auto *add = new QPushButton("Создать", page);
+        auto *play = new QPushButton("Играть", page);
         auto *result = new QPushButton("Результат", page);
         auto *remove = new QPushButton("Удалить", page);
         buttons->addWidget(add);
+        buttons->addWidget(play);
         buttons->addWidget(result);
         buttons->addWidget(remove);
         buttons->addStretch();
 
         qobject_cast<QVBoxLayout *>(page->layout())->addLayout(buttons);
         connect(add, &QPushButton::clicked, this, &MainWindow::addMatch);
+        connect(play, &QPushButton::clicked, this, &MainWindow::playMatch);
         connect(result, &QPushButton::clicked, this, &MainWindow::setMatchResult);
         connect(remove, &QPushButton::clicked, this, &MainWindow::deleteMatch);
 
@@ -875,6 +879,33 @@ void MainWindow::addMatch()
     } catch (const ChessException &e) {
         QMessageBox::warning(this, "Ошибка", e.what());
     }
+}
+
+void MainWindow::playMatch()
+{
+    const int id = selectedId(_matchesTab);
+    if (id < 0) {
+        message("Выберите партию в таблице.");
+        return;
+    }
+
+    auto match = _club->findMatchById(id);
+    if (!match) {
+        message("Партия не найдена.");
+        return;
+    }
+    if (!match->hasGame()) {
+        message("У этой партии нет истории ходов (она импортирована из старого формата).");
+        return;
+    }
+    if (match->getResult().isPlayed()) {
+        message("Партия уже завершена — результат записан.");
+        return;
+    }
+
+    GameDialog dialog(_club.get(), id, this);
+    dialog.exec();
+    refreshAll();
 }
 
 void MainWindow::setMatchResult()
