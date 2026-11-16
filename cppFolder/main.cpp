@@ -8,6 +8,7 @@
 
 #include "baseFunction.h"
 #include "chessClub.h"
+#include "chessgame.h"
 #include "coach.h"
 #include "exceptions/exception.h"
 #include "files.h"
@@ -88,6 +89,8 @@ void printMainMenu() {
     cout << "|11. Ввести результат партии            |\n";
     cout << "|13. Перенумеровать ID                  |\n";
     cout << "|14. Архив участника                    |\n";
+    cout << "|15. Сделать ход в партии               |\n";
+    cout << "|16. Завершить партию (сдача/ничья)     |\n";
     cout << "|_______________________________________|\n";
     cout << "|             ЛР — Файлы                |\n";
     cout << "|_______________________________________|\n";
@@ -334,6 +337,42 @@ void demoArchive(ChessClub &club) {
     }
 }
 
+void demoPlayMove(ChessClub &club) {
+    int id = inputNumber<int>("ID партии: ", 1, 99999);
+    string uci = inputString("Ход (например e2e4): ");
+
+    if (club.playMove(id, uci)) {
+        logAction("ход " + uci + " в партии " + to_string(id));
+        cout << "Ход принят.\n";
+
+        auto match = club.findMatchById(id);
+        if (match && match->game() && match->game()->isOver()) {
+            cout << "Партия окончена. Результат: " << match->getResult() << "\n";
+        }
+    } else {
+        cout << "Ход отклонён: нелегален, партия окончена или в ней нет истории ходов.\n";
+    }
+}
+
+void demoEndGame(ChessClub &club) {
+    int id = inputNumber<int>("ID партии: ", 1, 99999);
+    int action = inputNumber<int>("1-сдались белые, 2-сдались чёрные, 3-ничья: ", 1, 3);
+
+    bool ok = false;
+    if (action == 3) {
+        ok = club.agreeDraw(id);
+    } else {
+        ok = club.resignMatch(id, action == 1);
+    }
+
+    if (ok) {
+        logAction("партия " + to_string(id) + " завершена, вариант " + to_string(action));
+        cout << "Партия завершена.\n";
+    } else {
+        cout << "Не удалось: нет партии с ходами или результат уже записан.\n";
+    }
+}
+
 } // namespace
 
 int main() {
@@ -362,7 +401,7 @@ int main() {
 
     while (true) {
         printMainMenu();
-        int c = inputNumber<int>("Ваш выбор: ", 0, 14);
+        int c = inputNumber<int>("Ваш выбор: ", 0, 16);
         if (c == 0) break;
 
         try {
@@ -385,6 +424,8 @@ int main() {
             case 12: demoReport(club); break;
             case 13: demoRenumber(club); break;
             case 14: demoArchive(club); break;
+            case 15: demoPlayMove(club); break;
+            case 16: demoEndGame(club); break;
             default: break;
             }
         } catch (const ChessException &e) {

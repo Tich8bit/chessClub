@@ -4,6 +4,7 @@
 #include <map>
 #include <stdexcept>
 
+#include "chessgame.h"
 #include "elo.h"
 #include "exceptions/exception.h"
 #include "player.h"
@@ -254,10 +255,23 @@ bool ChessClub::setMatchResult(int matchId, MatchResult::Result result, int kOve
         return false;
     }
 
+    // Если партия ведётся ходами, результат руками не вводится.
+    if (match->hasGame()) {
+        return false;
+    }
+
+    match->setResult(result);
+    applyElo(*match, kOverride);
+
+    return true;
+}
+
+void ChessClub::applyElo(Match& match, int kOverride)
+{
     int k = 20;
     Elo::Discipline discipline = Elo::Discipline::Classical;
 
-    if (auto tournament = findTournamentById(match->getTournamentId())) {
+    if (auto tournament = findTournamentById(match.getTournamentId())) {
         switch (tournament->getTimeControl()) {
         case Tournament::TimeControl::Blitz:
             discipline = Elo::Discipline::Blitz;
@@ -276,10 +290,67 @@ bool ChessClub::setMatchResult(int matchId, MatchResult::Result result, int kOve
         k = kOverride;
     }
 
-    match->setResult(result);
-    Elo::applyMatch(*match, k, discipline);
+    Elo::applyMatch(match, k, discipline);
     recalculateStatistics();
+}
 
+void ChessClub::applyGameResult(Match& match)
+{
+    auto game = match.game();
+    if (!game || !game->isOver()) {
+        return;
+    }
+
+    if (game->whiteWon()) {
+        match.setResult(MatchResult::Result::WhiteWin);
+    } else if (game->blackWon()) {
+        match.setResult(MatchResult::Result::BlackWin);
+    } else {
+        match.setResult(MatchResult::Result::Draw);
+    }
+
+    applyElo(match);
+}
+
+bool ChessClub::playMove(int matchId, const std::string& uci)
+{
+    auto match = findMatchById(matchId);
+    if (!match || !match->hasGame() || match->getResult().isPlayed()) {
+        return false;
+    }
+
+    if (!match->game()->makeMove(uci)) {
+        return false;
+    }
+
+    if (match->game()->isOver()) {
+        applyGameResult(*match);
+    }
+
+    return true;
+}
+
+bool ChessClub::resignMatch(int matchId, bool whiteSide)
+{
+    auto match = findMatchById(matchId);
+    if (!match || !match->hasGame() || match->getResult().isPlayed()) {
+        return false;
+    }
+
+    match->game()->resign(whiteSide);
+    applyGameResult(*match);
+    return true;
+}
+
+bool ChessClub::agreeDraw(int matchId)
+{
+    auto match = findMatchById(matchId);
+    if (!match || !match->hasGame() || match->getResult().isPlayed()) {
+        return false;
+    }
+
+    match->game()->agreeDraw();
+    applyGameResult(*match);
     return true;
 }
 

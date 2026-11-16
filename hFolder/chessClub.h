@@ -63,6 +63,11 @@ public:
     // Фиксирует результат партии и пересчитывает Эло. Повторно нельзя.
     bool setMatchResult(int matchId, MatchResult::Result result, int kOverride = 0);
 
+    // Ходы в партии (UCI: "e2e4"). Результат появляется автоматически, когда игра окончена.
+    bool playMove(int matchId, const std::string& uci);
+    bool resignMatch(int matchId, bool whiteSide);
+    bool agreeDraw(int matchId);
+
     std::vector<std::shared_ptr<Member>> sortedPlayers(SortKey key, bool ascending = true) const;
 
     // Все партии участника (в турнирах и вне их).
@@ -84,6 +89,9 @@ public:
     ChessClub& operator+=(std::shared_ptr<Match> match);
 
 private:
+    void applyElo(Match& match, int kOverride = 0);
+    void applyGameResult(Match& match);
+
     std::string _clubName;
     Collection<Member> _players;
     Collection<Event> _events;

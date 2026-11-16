@@ -1,9 +1,11 @@
 #include "match.h"
+#include "chessgame.h"
 #include "player.h"
 #include "exceptions/exception.h"
 
 Match::Match(int id, std::shared_ptr<Player> whitePlayer, std::shared_ptr<Player> blackPlayer, const DateTime& date)
-    : _id(id), _whitePlayer(whitePlayer), _blackPlayer(blackPlayer), _date(date), _result(MatchResult::Result::NotPlayed) {
+    : _id(id), _whitePlayer(whitePlayer), _blackPlayer(blackPlayer), _date(date),
+      _result(MatchResult::Result::NotPlayed), _game(std::make_shared<ChessGame>()) {
     if (id <= 0) throw InvalidDataException("ID партии > 0");
     if (!whitePlayer || !blackPlayer) throw InvalidDataException("пустые игроки");
 }
@@ -17,6 +19,10 @@ void Match::setResult(MatchResult::Result newResult) { _result.setResult(newResu
 
 int Match::getTournamentId() const { return _tournamentId; }
 void Match::setTournamentId(int tournamentId) { _tournamentId = tournamentId; }
+
+bool Match::hasGame() const { return _game != nullptr; }
+std::shared_ptr<ChessGame> Match::game() const { return _game; }
+void Match::setGame(std::shared_ptr<ChessGame> game) { _game = std::move(game); }
 
 std::ostream& operator<<(std::ostream& os, const Match& m) {
     os << "ID: " << m._id << " | " << m._date << " | " << m._whitePlayer->getFullName() << " vs " << m._blackPlayer->getFullName() << " | " << m._result;

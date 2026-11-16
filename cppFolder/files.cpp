@@ -8,6 +8,7 @@
 #include <sstream>
 
 #include "coach.h"
+#include "chessgame.h"
 #include "exceptions/exception.h"
 #include "matchResult.h"
 #include "player.h"
@@ -85,10 +86,20 @@ void StorageManager::saveMatches(std::ofstream& ofs, const ChessClub& club) {
     ofs << matches.size() << "\n";
 
     for (const auto& m : matches) {
+        std::vector<std::string> moves;
+        if (m->hasGame() && m->game()) {
+            moves = m->game()->history();
+        }
+
         ofs << PREFIX_MATCH << " " << m->getId() << " " << m->getWhitePlayer()->getId() << " "
             << m->getBlackPlayer()->getId() << " " << std::quoted(m->getDate().toString()) << " "
             << static_cast<int>(m->getResult().getResult()) << " "
-            << m->getTournamentId() << "\n";
+            << m->getTournamentId() << " " << moves.size();
+
+        for (const auto& uci : moves) {
+            ofs << " " << uci;
+        }
+        ofs << "\n";
     }
 }
 
@@ -99,8 +110,9 @@ void StorageManager::loadState(const std::string& filename, ChessClub& club) {
     std::string header;
     ifs >> header;
 
-    // CHESSDB3 — с флагом архива, CHESSDB2 — без, иначе старый формат.
-    const bool withArchive = (header == "CHESSDB3");
+    // CHESSDB4 — ходы партий, CHESSDB3 — архив, CHESSDB2 — ссылки на турниры.
+    const bool withMoves = (header == "CHESSDB4");
+    const bool withArchive = withMoves || (header == "CHESSDB3");
     const bool withExtras = withArchive || (header == "CHESSDB2");
     if (!withExtras) {
         ifs.clear();
@@ -129,7 +141,7 @@ void StorageManager::loadState(const std::string& filename, ChessClub& club) {
 
     int matchesCount = 0;
     ifs >> matchesCount;
-    for (int i = 0; i < matchesCount; ++i) loadMatch(ifs, club, withExtras);
+    for (int i = 0; i < matchesCount; ++i) loadMatch(ifs, club, withExtras, withMoves);
 
     if (!ifs) throw InvalidDataException("файл повреждён: неожиданный конец данных");
 
@@ -235,7 +247,7 @@ void StorageManager::loadTraining(std::ifstream& ifs, ChessClub& club) {
     club.addEvent(std::make_shared<TrainingSession>(id, title, topic, durationMinutes, coach));
 }
 
-void StorageManager::loadMatch(std::ifstream& ifs, ChessClub& club, bool withTournamentId) {
+void StorageManager::loadMatch(std::ifstream& ifs, ChessClub& club, bool withTournamentId, bool withMoves) {
     std::string prefix, dateStr;
     int id, whiteId, blackId, resultInt;
 
@@ -247,6 +259,22 @@ void StorageManager::loadMatch(std::ifstream& ifs, ChessClub& club, bool withTou
     int tournamentId = -1;
     if (withTournamentId && !(ifs >> tournamentId)) {
         throw InvalidDataException("ошибка чтения турнира партии");
+    }
+
+    std::vector<std::string> moves;
+    if (withMoves) {
+        size_t movesCount = 0;
+        if (!(ifs >> movesCount)) {
+            throw InvalidDataException("ошибка чтения количества ходов");
+        }
+        moves.reserve(movesCount);
+        for (size_t i = 0; i < movesCount; ++i) {
+            std::string uci;
+            if (!(ifs >> uci)) {
+                throw InvalidDataException("ошибка чтения хода");
+            }
+            moves.push_back(uci);
+        }
     }
 
     int d, m, y, h = 0, min = 0, s = 0;
@@ -274,6 +302,19 @@ void StorageManager::loadMatch(std::ifstream& ifs, ChessClub& club, bool withTou
     auto match = std::make_shared<Match>(id, white, black, date);
     match->setResult(static_cast<MatchResult::Result>(resultInt));
     match->setTournamentId(tournamentId);
+
+    if (withMoves && !moves.empty()) {
+        auto game = std::make_shared<ChessGame>();
+        if (game->replay(moves)) {
+            match->setGame(game);
+        } else {
+            match->setGame(nullptr);
+        }
+    } else if (!withMoves) {
+        // Старый формат: истории ходов нет.
+        match->setGame(nullptr);
+    }
+
     club.addMatch(match);
 
     if (tournamentId > 0) {

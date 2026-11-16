@@ -5,6 +5,7 @@
 #include "dateTime.h"
 
 class Player;
+class ChessGame;
 
 class Match {
     friend class ChessClub;
@@ -20,6 +21,11 @@ public:
     // Турнир, в рамках которого играется партия (-1 — вне турнира).
     int getTournamentId() const;
     void setTournamentId(int tournamentId);
+
+    // Партия с ходами. nullptr — импортированный матч без истории.
+    bool hasGame() const;
+    std::shared_ptr<ChessGame> game() const;
+    void setGame(std::shared_ptr<ChessGame> game);
     friend std::ostream& operator<<(std::ostream& os, const Match& m);
 private:
     int _id;
@@ -28,4 +34,5 @@ private:
     DateTime _date;
     MatchResult _result;
     int _tournamentId = -1;
+    std::shared_ptr<ChessGame> _game;
 };
