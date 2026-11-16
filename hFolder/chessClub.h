@@ -47,6 +47,10 @@ public:
     bool removeEvent(int id);
     bool removeMatch(int id);
 
+    // Архив: скрыть участника, сохранив его партии и историю.
+    bool archivePlayer(int id);
+    bool unarchivePlayer(int id);
+
     // Запись игрока на турнир и обратно.
     bool enrollPlayer(int tournamentId, int playerId);
     bool withdrawPlayer(int tournamentId, int playerId);

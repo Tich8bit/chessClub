@@ -42,13 +42,14 @@ void StorageManager::savePlayers(std::ofstream& ofs, const ChessClub& club) {
                 << p->getRatings().getClassical() << " " << p->getRatings().getRapid() << " "
                 << p->getRatings().getBlitz() << " " << p->getWins() << " " << p->getDraws() << " "
                 << p->getLosses() << " " << coach->getExperienceYears() << " "
-                << specInt << " " << coach->getQualificationLevel() << "\n";
+                << specInt << " " << coach->getQualificationLevel() << " "
+                << (p->isArchived() ? 1 : 0) << "\n";
         } else {
             ofs << PREFIX_PLAYER << " " << p->getId() << " " << std::quoted(lastName) << " "
                 << std::quoted(firstName) << " " << std::quoted(middleName) << " "
                 << p->getRatings().getClassical() << " " << p->getRatings().getRapid() << " "
                 << p->getRatings().getBlitz() << " " << p->getWins() << " " << p->getDraws() << " "
-                << p->getLosses() << "\n";
+                << p->getLosses() << " " << (p->isArchived() ? 1 : 0) << "\n";
         }
     }
 }
@@ -97,7 +98,10 @@ void StorageManager::loadState(const std::string& filename, ChessClub& club) {
 
     std::string header;
     ifs >> header;
-    const bool withExtras = (header == HEADER);
+
+    // CHESSDB3 — с флагом архива, CHESSDB2 — без, иначе старый формат.
+    const bool withArchive = (header == "CHESSDB3");
+    const bool withExtras = withArchive || (header == "CHESSDB2");
     if (!withExtras) {
         ifs.clear();
         ifs.seekg(0);
@@ -108,8 +112,8 @@ void StorageManager::loadState(const std::string& filename, ChessClub& club) {
     for (int i = 0; i < playersCount; ++i) {
         std::string prefix;
         ifs >> prefix;
-        if (prefix == PREFIX_PLAYER) loadPlayer(ifs, club);
-        else if (prefix == PREFIX_COACH) loadCoach(ifs, club);
+        if (prefix == PREFIX_PLAYER) loadPlayer(ifs, club, withArchive);
+        else if (prefix == PREFIX_COACH) loadCoach(ifs, club, withArchive);
         else throw InvalidDataException("неверный префикс участника: " + prefix);
     }
 
@@ -134,7 +138,7 @@ void StorageManager::loadState(const std::string& filename, ChessClub& club) {
     club.recalculateStatistics();
 }
 
-void StorageManager::loadPlayer(std::ifstream& ifs, ChessClub& club) {
+void StorageManager::loadPlayer(std::ifstream& ifs, ChessClub& club, bool withArchive) {
     int id, classical, rapid, blitz, wins, draws, losses;
     std::string lastName, firstName, middleName;
 
@@ -143,11 +147,18 @@ void StorageManager::loadPlayer(std::ifstream& ifs, ChessClub& club) {
         throw InvalidDataException("ошибка чтения данных игрока");
     }
 
-    club.addPlayer(std::make_shared<Player>(id, firstName, lastName, middleName,
-        Ratings(classical, rapid, blitz), wins, draws, losses));
+    int archived = 0;
+    if (withArchive && !(ifs >> archived)) {
+        throw InvalidDataException("ошибка чтения флага архива игрока");
+    }
+
+    auto player = std::make_shared<Player>(id, firstName, lastName, middleName,
+        Ratings(classical, rapid, blitz), wins, draws, losses);
+    player->setArchived(archived != 0);
+    club.addPlayer(player);
 }
 
-void StorageManager::loadCoach(std::ifstream& ifs, ChessClub& club) {
+void StorageManager::loadCoach(std::ifstream& ifs, ChessClub& club, bool withArchive) {
     int id, classical, rapid, blitz, wins, draws, losses, experienceYears, specInt, qualificationLevel;
     std::string lastName, firstName, middleName;
 
@@ -157,9 +168,16 @@ void StorageManager::loadCoach(std::ifstream& ifs, ChessClub& club) {
         throw InvalidDataException("ошибка чтения данных тренера");
     }
 
-    club.addPlayer(std::make_shared<Coach>(id, firstName, lastName, middleName,
+    int archived = 0;
+    if (withArchive && !(ifs >> archived)) {
+        throw InvalidDataException("ошибка чтения флага архива тренера");
+    }
+
+    auto coach = std::make_shared<Coach>(id, firstName, lastName, middleName,
         Ratings(classical, rapid, blitz), wins, draws, losses,
-        experienceYears, Specialization(static_cast<Specialization::Type>(specInt)), qualificationLevel));
+        experienceYears, Specialization(static_cast<Specialization::Type>(specInt)), qualificationLevel);
+    coach->setArchived(archived != 0);
+    club.addPlayer(coach);
 }
 
 void StorageManager::loadTournament(std::ifstream& ifs, ChessClub& club, bool withParticipants) {
@@ -276,6 +294,7 @@ void StorageManager::generateReport(const std::string& reportFilename, const Che
     reportEvents(ofs, club);
     reportMatches(ofs, club);
     reportStandings(ofs, club);
+    reportArchive(ofs, club);
 }
 
 void StorageManager::reportPlayers(std::ofstream& ofs, const ChessClub& club) {
@@ -285,6 +304,7 @@ void StorageManager::reportPlayers(std::ofstream& ofs, const ChessClub& club) {
     for (const auto& p : players) {
         ofs << "  - [" << p->getRole() << "] " << p->getFullName()
             << " | ID: " << p->getId()
+            << (p->isArchived() ? " | АРХИВ" : "")
             << " | " << p->getRatings()
             << " | В/Н/П: " << p->getWins() << "/" << p->getDraws() << "/" << p->getLosses()
             << " | Очки: " << p->getScore() << "\n";
@@ -344,8 +364,29 @@ void StorageManager::reportStandings(std::ofstream& ofs, const ChessClub& club) 
     }
 }
 
-void StorageManager::logAction(const std::string& logFilename, const std::string& action) {
-    std::ofstream ofs(logFilename, std::ios::app);
+void StorageManager::reportArchive(std::ofstream& ofs, const ChessClub& club) {
+    std::vector<std::shared_ptr<Member>> archived;
+
+    for (const auto& member : club.getPlayers()) {
+        if (member->isArchived()) {
+            archived.push_back(member);
+        }
+    }
+
+    if (archived.empty()) {
+        return;
+    }
+
+    ofs << "АРХИВ (" << archived.size() << "):\n";
+    for (const auto& member : archived) {
+        ofs << "  - [" << member->getRole() << "] " << member->getFullName()
+            << " | ID: " << member->getId()
+            << " | " << member->getRatings() << "\n";
+    }
+    ofs << "\n";
+}
+
+void StorageManager::logAction(const std::string& logFilename, const std::string& action) {    std::ofstream ofs(logFilename, std::ios::app);
     if (!ofs.is_open()) throw InvalidOperationException("не удалось открыть лог-файл");
 
     std::time_t now = std::time(nullptr);

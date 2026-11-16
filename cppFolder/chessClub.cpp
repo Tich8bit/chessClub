@@ -150,6 +150,26 @@ bool ChessClub::removeMatch(int id)
     return true;
 }
 
+bool ChessClub::archivePlayer(int id)
+{
+    auto member = findPlayerById(id);
+    if (!member) {
+        return false;
+    }
+    member->setArchived(true);
+    return true;
+}
+
+bool ChessClub::unarchivePlayer(int id)
+{
+    auto member = findPlayerById(id);
+    if (!member) {
+        return false;
+    }
+    member->setArchived(false);
+    return true;
+}
+
 bool ChessClub::enrollPlayer(int tournamentId, int playerId)
 {
     auto tournament = findTournamentById(tournamentId);
@@ -158,7 +178,7 @@ bool ChessClub::enrollPlayer(int tournamentId, int playerId)
     }
 
     auto member = findPlayerById(playerId);
-    if (!member || !std::dynamic_pointer_cast<Player>(member)) {
+    if (!member || !std::dynamic_pointer_cast<Player>(member) || member->isArchived()) {
         return false;
     }
 

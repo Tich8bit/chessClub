@@ -27,6 +27,10 @@ public:
     void setRatings(const Ratings& ratings);
     void resetStatistics();
 
+    // Архив: участник скрыт из активных списков, но история сохраняется.
+    bool isArchived() const;
+    void setArchived(bool archived);
+
     virtual std::string getRole() const = 0;
     virtual double calculateMetric() const = 0;
     virtual std::string getMetricName() const = 0;
@@ -43,4 +47,5 @@ protected:
     int _wins;
     int _draws;
     int _losses;
+    bool _archived = false;
 };

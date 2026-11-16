@@ -2,6 +2,7 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QCheckBox>
 #include <QDialog>
 #include <QDir>
 #include <QFileInfo>
@@ -171,8 +172,12 @@ void MainWindow::buildUi()
         auto *add = new QPushButton("Добавить", page);
         auto *remove = new QPushButton("Удалить", page);
         auto *history = new QPushButton("История матчей", page);
+        auto *archive = new QPushButton("В архив", page);
+        auto *restore = new QPushButton("Из архива", page);
         buttons->addWidget(add);
         buttons->addWidget(remove);
+        buttons->addWidget(archive);
+        buttons->addWidget(restore);
         buttons->addWidget(history);
         buttons->addStretch();
 
@@ -180,6 +185,12 @@ void MainWindow::buildUi()
         connect(add, &QPushButton::clicked, this, &MainWindow::addPlayer);
         connect(remove, &QPushButton::clicked, this, &MainWindow::deletePlayer);
         connect(history, &QPushButton::clicked, this, &MainWindow::showPlayerHistory);
+        connect(archive, &QPushButton::clicked, this, [this]() {
+            setArchivedForSelected(_playersTab, true);
+        });
+        connect(restore, &QPushButton::clicked, this, [this]() {
+            setArchivedForSelected(_playersTab, false);
+        });
 
         _tabs->addTab(page, "Игроки");
     }
@@ -192,13 +203,23 @@ void MainWindow::buildUi()
         auto *buttons = new QHBoxLayout;
         auto *add = new QPushButton("Добавить", page);
         auto *remove = new QPushButton("Удалить", page);
+        auto *archive = new QPushButton("В архив", page);
+        auto *restore = new QPushButton("Из архива", page);
         buttons->addWidget(add);
         buttons->addWidget(remove);
+        buttons->addWidget(archive);
+        buttons->addWidget(restore);
         buttons->addStretch();
 
         qobject_cast<QVBoxLayout *>(page->layout())->addLayout(buttons);
         connect(add, &QPushButton::clicked, this, &MainWindow::addCoach);
         connect(remove, &QPushButton::clicked, this, &MainWindow::deleteCoach);
+        connect(archive, &QPushButton::clicked, this, [this]() {
+            setArchivedForSelected(_coachesTab, true);
+        });
+        connect(restore, &QPushButton::clicked, this, [this]() {
+            setArchivedForSelected(_coachesTab, false);
+        });
 
         _tabs->addTab(page, "Тренеры");
     }
@@ -277,10 +298,16 @@ QWidget *MainWindow::buildTableTab(Tab &tab, const QStringList &headers)
     tab.filter = new QLineEdit;
     tab.filter->setPlaceholderText("Фильтр по таблице...");
 
+    tab.showArchive = new QCheckBox("Показывать архив");
+    tab.showArchive->setChecked(false);
+
     auto *page = new QWidget;
     auto *layout = new QVBoxLayout(page);
     layout->addWidget(tab.filter);
+    layout->addWidget(tab.showArchive);
     layout->addWidget(tab.view, 1);
+
+    connect(tab.showArchive, &QCheckBox::toggled, this, [this](bool) { refreshAll(); });
 
     Tab *tabPtr = &tab;
     connect(tab.filter, &QLineEdit::textChanged, this, [tabPtr](const QString &text) {
@@ -305,15 +332,20 @@ void MainWindow::refreshAll()
 void MainWindow::refreshPlayers()
 {
     QVector<ChessTableModel::Row> rows;
+    const bool showArchived = _playersTab.showArchive && _playersTab.showArchive->isChecked();
 
     for (const auto &member : _club->getPlayers()) {
         auto player = std::dynamic_pointer_cast<Player>(member);
         if (!player) {
             continue;
         }
+        if (player->isArchived() && !showArchived) {
+            continue;
+        }
 
         ChessTableModel::Row row;
         row.id = player->getId();
+        row.muted = player->isArchived();
         row.text = {
             QString::number(player->getId()),
             QString::fromStdString(player->getFullName()),
@@ -346,15 +378,20 @@ void MainWindow::refreshPlayers()
 void MainWindow::refreshCoaches()
 {
     QVector<ChessTableModel::Row> rows;
+    const bool showArchived = _coachesTab.showArchive && _coachesTab.showArchive->isChecked();
 
     for (const auto &member : _club->getPlayers()) {
         auto coach = std::dynamic_pointer_cast<Coach>(member);
         if (!coach) {
             continue;
         }
+        if (coach->isArchived() && !showArchived) {
+            continue;
+        }
 
         ChessTableModel::Row row;
         row.id = coach->getId();
+        row.muted = coach->isArchived();
         row.text = {
             QString::number(coach->getId()),
             QString::fromStdString(coach->getFullName()),
@@ -569,6 +606,27 @@ void MainWindow::showPlayerHistory()
     }
 
     QMessageBox::information(this, "История матчей", header + body);
+}
+
+void MainWindow::setArchivedForSelected(const Tab &tab, bool archived)
+{
+    const int id = selectedId(tab);
+    if (id < 0) {
+        message("Выберите строку в таблице.");
+        return;
+    }
+
+    const bool ok = archived ? _club->archivePlayer(id) : _club->unarchivePlayer(id);
+    if (!ok) {
+        message("Участник не найден.");
+        return;
+    }
+
+    logAction(archived ? QString("в архив ID=%1").arg(id)
+                       : QString("из архива ID=%1").arg(id));
+    refreshAll();
+    statusBar()->showMessage(archived ? "Участник перемещён в архив."
+                                      : "Участник возвращён из архива.", 4000);
 }
 
 void MainWindow::deletePlayer()

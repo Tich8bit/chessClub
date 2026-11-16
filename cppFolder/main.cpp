@@ -87,6 +87,7 @@ void printMainMenu() {
     cout << "|10. Записать игрока на турнир          |\n";
     cout << "|11. Ввести результат партии            |\n";
     cout << "|13. Перенумеровать ID                  |\n";
+    cout << "|14. Архив участника                    |\n";
     cout << "|_______________________________________|\n";
     cout << "|             ЛР — Файлы                |\n";
     cout << "|_______________________________________|\n";
@@ -320,6 +321,19 @@ void demoRenumber(ChessClub &club) {
     cout << "ID перенумерованы: участники, события и партии — 1..N.\n";
 }
 
+void demoArchive(ChessClub &club) {
+    int id = inputNumber<int>("ID участника: ", 1, 99999);
+    int action = inputNumber<int>("1-в архив, 2-из архива: ", 1, 2);
+
+    const bool ok = (action == 1) ? club.archivePlayer(id) : club.unarchivePlayer(id);
+    if (ok) {
+        logAction(std::string(action == 1 ? "в архив ID=" : "из архива ID=") + std::to_string(id));
+        cout << "Готово.\n";
+    } else {
+        cout << "Участник не найден.\n";
+    }
+}
+
 } // namespace
 
 int main() {
@@ -348,7 +362,7 @@ int main() {
 
     while (true) {
         printMainMenu();
-        int c = inputNumber<int>("Ваш выбор: ", 0, 13);
+        int c = inputNumber<int>("Ваш выбор: ", 0, 14);
         if (c == 0) break;
 
         try {
@@ -370,6 +384,7 @@ int main() {
             case 11: demoSetResult(club); break;
             case 12: demoReport(club); break;
             case 13: demoRenumber(club); break;
+            case 14: demoArchive(club); break;
             default: break;
             }
         } catch (const ChessException &e) {

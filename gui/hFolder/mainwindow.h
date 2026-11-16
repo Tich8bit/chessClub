@@ -7,6 +7,7 @@
 
 class ChessClub;
 class ChessTableModel;
+class QCheckBox;
 class QLineEdit;
 class QSortFilterProxyModel;
 class QTableView;
@@ -51,6 +52,7 @@ private:
         QSortFilterProxyModel *proxy = nullptr;
         QTableView *view = nullptr;
         QLineEdit *filter = nullptr;
+        QCheckBox *showArchive = nullptr;
     };
 
     void buildUi();
@@ -62,6 +64,7 @@ private:
     void refreshMatches();
 
     int selectedId(const Tab &tab) const;
+    void setArchivedForSelected(const Tab &tab, bool archived);
     void logAction(const QString &action);
     void message(const QString &text);
 

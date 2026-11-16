@@ -23,8 +23,8 @@ private:
     static void saveEvents(std::ofstream& ofs, const ChessClub& club);
     static void saveMatches(std::ofstream& ofs, const ChessClub& club);
 
-    static void loadPlayer(std::ifstream& ifs, ChessClub& club);
-    static void loadCoach(std::ifstream& ifs, ChessClub& club);
+    static void loadPlayer(std::ifstream& ifs, ChessClub& club, bool withArchive);
+    static void loadCoach(std::ifstream& ifs, ChessClub& club, bool withArchive);
     static void loadTournament(std::ifstream& ifs, ChessClub& club, bool withParticipants);
     static void loadTraining(std::ifstream& ifs, ChessClub& club);
     static void loadMatch(std::ifstream& ifs, ChessClub& club, bool withTournamentId);
@@ -33,8 +33,9 @@ private:
     static void reportEvents(std::ofstream& ofs, const ChessClub& club);
     static void reportMatches(std::ofstream& ofs, const ChessClub& club);
     static void reportStandings(std::ofstream& ofs, const ChessClub& club);
+    static void reportArchive(std::ofstream& ofs, const ChessClub& club);
 
-    static constexpr const char* HEADER = "CHESSDB2";
+    static constexpr const char* HEADER = "CHESSDB3";
     static constexpr const char* PREFIX_PLAYER     = "PLR";
     static constexpr const char* PREFIX_COACH      = "CHC";
     static constexpr const char* PREFIX_TOURNAMENT = "TRN";

@@ -16,6 +16,7 @@ public:
         QStringList text;
         QVariantList values;
         int id = -1;
+        bool muted = false;   // архивные строки — серым
     };
 
     explicit ChessTableModel(QObject *parent = nullptr);

@@ -48,6 +48,14 @@ void Member::resetStatistics() {
     _losses = 0;
 }
 
+bool Member::isArchived() const {
+    return _archived;
+}
+
+void Member::setArchived(bool archived) {
+    _archived = archived;
+}
+
 std::ostream& operator<<(std::ostream& os, const Member& m) {
     os << "[" << m.getRole() << "] " << m.getFullName() << " | ID: " << m._id << " | Метрика: " << m.calculateMetric();
     m.printInfo(os);

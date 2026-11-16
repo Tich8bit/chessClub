@@ -1,5 +1,8 @@
 #include "chestablemodel.h"
 
+#include <QBrush>
+#include <QColor>
+
 ChessTableModel::ChessTableModel(QObject *parent)
     : QAbstractTableModel(parent)
 {
@@ -48,6 +51,9 @@ QVariant ChessTableModel::data(const QModelIndex &index, int role) const
     if (role == Qt::ToolTipRole) {
         // Полный текст в подсказке: длинные ФИО обрезаются в колонке.
         return index.column() < row.text.size() ? row.text[index.column()] : QString();
+    }
+    if (role == Qt::ForegroundRole && row.muted) {
+        return QBrush(QColor(140, 140, 140));
     }
     if (role == Qt::TextAlignmentRole) {
         // Числа по центру, текстовые колонки — по левому краю.
