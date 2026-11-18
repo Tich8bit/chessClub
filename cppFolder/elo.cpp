@@ -14,16 +14,18 @@ double expectedScore(int rating, int opponentRating)
 
 int pickRating(const Ratings& ratings, Elo::Discipline discipline)
 {
+    using enum Elo::Discipline;
     switch (discipline) {
-    case Elo::Discipline::Rapid: return ratings.getRapid();
-    case Elo::Discipline::Blitz: return ratings.getBlitz();
-    case Elo::Discipline::Classical:
-    default:                     return ratings.getClassical();
+    case Rapid:     return ratings.getRapid();
+    case Blitz:     return ratings.getBlitz();
+    case Classical:
+    default:        return ratings.getClassical();
     }
 }
 
 Ratings withDelta(const Ratings& ratings, Elo::Discipline discipline, int delta)
 {
+    using enum Elo::Discipline;
     auto clamp = [](int value) { return std::clamp(value, 0, 3000); };
 
     int classical = ratings.getClassical();
@@ -31,10 +33,9 @@ Ratings withDelta(const Ratings& ratings, Elo::Discipline discipline, int delta)
     int blitz = ratings.getBlitz();
 
     switch (discipline) {
-    case Elo::Discipline::Rapid: rapid = clamp(rapid + delta); break;
-    case Elo::Discipline::Blitz: blitz = clamp(blitz + delta); break;
-    case Elo::Discipline::Classical:
-    default:                     classical = clamp(classical + delta); break;
+    case Rapid:     rapid = clamp(rapid + delta); break;
+    case Blitz:     blitz = clamp(blitz + delta); break;
+    case Classical: classical = clamp(classical + delta); break;
     }
 
     return Ratings(classical, rapid, blitz);
@@ -58,7 +59,7 @@ int Elo::deltaFor(int rating, int opponentRating, double score, int k)
     return static_cast<int>(std::lround(k * (score - expected)));
 }
 
-void Elo::applyMatch(Match& match, int k, Discipline discipline)
+void Elo::applyMatch(const Match& match, int k, Discipline discipline)
 {
     if (!match.getResult().isPlayed()) {
         return;

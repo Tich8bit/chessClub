@@ -12,10 +12,11 @@ void Player::printInfo(std::ostream& os) const {
 }
 
 void Player::applyTrainingEffect(const Specialization& spec) {
+    using enum Specialization::RatingType;
     auto target = spec.getTargetRating();
     const int boost = 10;
-    if (target == Specialization::RatingType::Classical) _ratings = Ratings(_ratings.getClassical() + boost, _ratings.getRapid(), _ratings.getBlitz());
-    else if (target == Specialization::RatingType::Rapid) _ratings = Ratings(_ratings.getClassical(), _ratings.getRapid() + boost, _ratings.getBlitz());
-    else if (target == Specialization::RatingType::Blitz) _ratings = Ratings(_ratings.getClassical(), _ratings.getRapid(), _ratings.getBlitz() + boost);
-    else if (target == Specialization::RatingType::All) _ratings = Ratings(_ratings.getClassical() + boost/2, _ratings.getRapid() + boost/2, _ratings.getBlitz() + boost/2);
+    if (target == Classical) _ratings = Ratings(_ratings.getClassical() + boost, _ratings.getRapid(), _ratings.getBlitz());
+    else if (target == Rapid) _ratings = Ratings(_ratings.getClassical(), _ratings.getRapid() + boost, _ratings.getBlitz());
+    else if (target == Blitz) _ratings = Ratings(_ratings.getClassical(), _ratings.getRapid(), _ratings.getBlitz() + boost);
+    else if (target == All) _ratings = Ratings(_ratings.getClassical() + boost/2, _ratings.getRapid() + boost/2, _ratings.getBlitz() + boost/2);
 }

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <map>
 #include <stdexcept>
+#include <utility>
 
 #include "chessgame.h"
 #include "elo.h"
@@ -151,7 +152,7 @@ bool ChessClub::removeMatch(int id)
     return true;
 }
 
-bool ChessClub::archivePlayer(int id)
+bool ChessClub::archivePlayer(int id) const
 {
     auto member = findPlayerById(id);
     if (!member) {
@@ -161,7 +162,7 @@ bool ChessClub::archivePlayer(int id)
     return true;
 }
 
-bool ChessClub::unarchivePlayer(int id)
+bool ChessClub::unarchivePlayer(int id) const
 {
     auto member = findPlayerById(id);
     if (!member) {
@@ -171,7 +172,7 @@ bool ChessClub::unarchivePlayer(int id)
     return true;
 }
 
-bool ChessClub::enrollPlayer(int tournamentId, int playerId)
+bool ChessClub::enrollPlayer(int tournamentId, int playerId) const
 {
     auto tournament = findTournamentById(tournamentId);
     if (!tournament) {
@@ -283,7 +284,7 @@ void ChessClub::applyElo(Match& match, int kOverride)
             discipline = Elo::Discipline::Classical;
             break;
         }
-        k = Elo::kFactor(static_cast<int>(tournament->getTimeControl()));
+        k = Elo::kFactor(std::to_underlying(tournament->getTimeControl()));
     }
 
     if (kOverride > 0) {
@@ -301,12 +302,13 @@ void ChessClub::applyGameResult(Match& match)
         return;
     }
 
+    using enum MatchResult::Result;
     if (game->whiteWon()) {
-        match.setResult(MatchResult::Result::WhiteWin);
+        match.setResult(WhiteWin);
     } else if (game->blackWon()) {
-        match.setResult(MatchResult::Result::BlackWin);
+        match.setResult(BlackWin);
     } else {
-        match.setResult(MatchResult::Result::Draw);
+        match.setResult(Draw);
     }
 
     applyElo(match);
@@ -354,7 +356,7 @@ bool ChessClub::agreeDraw(int matchId)
     return true;
 }
 
-bool ChessClub::undoMove(int matchId)
+bool ChessClub::undoMove(int matchId) const
 {
     auto match = findMatchById(matchId);
     if (!match || !match->hasGame() || match->getResult().isPlayed()) {
@@ -364,7 +366,7 @@ bool ChessClub::undoMove(int matchId)
     return match->game()->undoMove();
 }
 
-void ChessClub::recalculateStatistics()
+void ChessClub::recalculateStatistics() const
 {
     for (const auto& member : _players) {
         member->resetStatistics();
@@ -386,11 +388,12 @@ std::vector<std::shared_ptr<Member>> ChessClub::sortedPlayers(SortKey key, bool 
 
     const auto comparator = [key](const std::shared_ptr<Member>& lhs,
                                   const std::shared_ptr<Member>& rhs) {
+        using enum SortKey;
         switch (key) {
-        case SortKey::ById:     return lhs->getId() < rhs->getId();
-        case SortKey::ByName:   return lhs->getFullName() < rhs->getFullName();
-        case SortKey::ByRating: return lhs->calculateMetric() < rhs->calculateMetric();
-        case SortKey::ByScore:  return lhs->getScore() < rhs->getScore();
+        case ById:     return lhs->getId() < rhs->getId();
+        case ByName:   return lhs->getFullName() < rhs->getFullName();
+        case ByRating: return lhs->calculateMetric() < rhs->calculateMetric();
+        case ByScore:  return lhs->getScore() < rhs->getScore();
         }
         return false;
     };
@@ -417,7 +420,7 @@ std::vector<std::shared_ptr<Match>> ChessClub::matchesOfPlayer(int playerId) con
     return result;
 }
 
-void ChessClub::renumberIds()
+void ChessClub::renumberIds() const
 {
     std::map<int, int> eventMap;
 

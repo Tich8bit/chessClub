@@ -2,8 +2,9 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <ctime>
-#include <iomanip>
+#include <format>
 #include <iostream>
 #include <sstream>
 
@@ -37,7 +38,7 @@ void StorageManager::savePlayers(std::ofstream& ofs, const ChessClub& club) {
         auto middleName = std::string(p->getMiddleName());
 
         if (auto coach = std::dynamic_pointer_cast<Coach>(p)) {
-            int specInt = static_cast<int>(coach->getSpecialization().getType());
+            int specInt = std::to_underlying(coach->getSpecialization().getType());
             ofs << PREFIX_COACH << " " << coach->getId() << " " << std::quoted(lastName) << " "
                 << std::quoted(firstName) << " " << std::quoted(middleName) << " "
                 << p->getRatings().getClassical() << " " << p->getRatings().getRapid() << " "
@@ -63,7 +64,7 @@ void StorageManager::saveEvents(std::ofstream& ofs, const ChessClub& club) {
         if (auto t = std::dynamic_pointer_cast<Tournament>(e)) {
             auto title = std::string(t->getTitle());
             ofs << PREFIX_TOURNAMENT << " " << t->getId() << " " << std::quoted(title) << " "
-                << static_cast<int>(t->getTimeControl()) << " " << t->getSystem()->getTypeId() << " "
+                << std::to_underlying(t->getTimeControl()) << " " << t->getSystem()->getTypeId() << " "
                 << t->getMaxPlayers() << " " << t->getParticipants().size();
 
             for (const auto& participant : t->getParticipants()) {
@@ -93,7 +94,7 @@ void StorageManager::saveMatches(std::ofstream& ofs, const ChessClub& club) {
 
         ofs << PREFIX_MATCH << " " << m->getId() << " " << m->getWhitePlayer()->getId() << " "
             << m->getBlackPlayer()->getId() << " " << std::quoted(m->getDate().toString()) << " "
-            << static_cast<int>(m->getResult().getResult()) << " "
+            << std::to_underlying(m->getResult().getResult()) << " "
             << m->getTournamentId() << " " << moves.size();
 
         for (const auto& uci : moves) {
@@ -427,15 +428,17 @@ void StorageManager::reportArchive(std::ofstream& ofs, const ChessClub& club) {
     ofs << "\n";
 }
 
-void StorageManager::logAction(const std::string& logFilename, const std::string& action) {    std::ofstream ofs(logFilename, std::ios::app);
+void StorageManager::logAction(const std::string& logFilename, const std::string& action) {
+    std::ofstream ofs(logFilename, std::ios::app);
     if (!ofs.is_open()) throw InvalidOperationException("не удалось открыть лог-файл");
 
-    std::time_t now = std::time(nullptr);
-    std::tm timeInfo;
-    localtime_s(&timeInfo, &now);
+    const auto now = std::chrono::system_clock::now();
+    std::tm timeInfo{};
+    localtime_s(&timeInfo, std::chrono::system_clock::to_time_t(now));
 
-    std::array<char, 100> buf{};
-    std::strftime(buf.data(), buf.size(), "%Y-%m-%d %H:%M:%S", &timeInfo);
+    const std::string timestamp = std::format("{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}",
+                                              timeInfo.tm_year + 1900, timeInfo.tm_mon + 1, timeInfo.tm_mday,
+                                              timeInfo.tm_hour, timeInfo.tm_min, timeInfo.tm_sec);
 
-    ofs << "[" << buf.data() << "] " << action << "\n";
+    ofs << "[" << timestamp << "] " << action << "\n";
 }

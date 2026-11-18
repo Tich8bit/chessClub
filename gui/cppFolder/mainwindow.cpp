@@ -48,9 +48,9 @@ QString timeControlName(Tournament::TimeControl control)
     return "?";
 }
 
-const char *STATE_FILE  = "club.txt";
-const char *LOG_FILE    = "journal.log";
-const char *REPORT_FILE = "report.txt";
+constexpr auto STATE_FILE  = "club.txt";
+constexpr auto LOG_FILE    = "journal.log";
+constexpr auto REPORT_FILE = "report.txt";
 
 // exe запускается из build\gui, а club.txt лежит в корне проекта.
 // Ищем файл в текущем каталоге и двумя уровнями выше.

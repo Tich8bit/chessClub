@@ -32,7 +32,7 @@ private:
     std::shared_ptr<Player> _whitePlayer;
     std::shared_ptr<Player> _blackPlayer;
     DateTime _date;
-    MatchResult _result;
+    MatchResult _result{MatchResult::Result::NotPlayed};
     int _tournamentId = -1;
     std::shared_ptr<ChessGame> _game;
 };

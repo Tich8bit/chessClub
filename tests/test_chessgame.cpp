@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "chessgame.h"
@@ -20,7 +21,7 @@ int main()
     for (const auto& move : moves) {
         const bool ok = game.makeMove(move);
         std::cout << move << " -> " << (ok ? "ok" : "REJECTED")
-                  << " | status: " << static_cast<int>(game.status())
+                  << " | status: " << std::to_underlying(game.status())
                   << " | check: " << (game.inCheck() ? "yes" : "no")
                   << " | legal: " << game.legalMoves().size() << "\n";
     }
@@ -31,7 +32,7 @@ int main()
     std::cout << "History size: " << game.history().size() << "\n";
     std::cout << "FEN after: " << game.fen() << "\n";
 
-    std::cout << "\nUndo one move -> status: " << static_cast<int>(game.status()) << "\n";
+    std::cout << "\nUndo one move -> status: " << std::to_underlying(game.status()) << "\n";
 
     return 0;
 }

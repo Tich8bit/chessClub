@@ -6,34 +6,38 @@ Specialization::Specialization(Type type) : _type(type) {}
 Specialization::Type Specialization::getType() const { return _type; }
 
 Specialization::RatingType Specialization::getTargetRating() const {
+    using enum Specialization::Type;
+    using enum Specialization::RatingType;
     switch (_type) {
-        case Type::Openings:   return RatingType::Classical;
-        case Type::Middlegame: return RatingType::Rapid;
-        case Type::Endgame:    return RatingType::Classical;
-        case Type::Tactics:    return RatingType::Blitz;
-        case Type::General:    return RatingType::All;
+    case Openings:   return Classical;
+    case Middlegame: return Rapid;
+    case Endgame:    return Classical;
+    case Tactics:    return Blitz;
+    case General:    return All;
     }
-    return RatingType::All;
+    return All;
 }
 
 std::string Specialization::toString() const {
+    using enum Specialization::Type;
     switch (_type) {
-        case Type::Openings: return "Дебюты";
-        case Type::Middlegame: return "Миттельшпиль";
-        case Type::Endgame: return "Эндшпиль";
-        case Type::Tactics: return "Тактика";
-        case Type::General: return "Общая подготовка";
+    case Openings:   return "Дебюты";
+    case Middlegame: return "Миттельшпиль";
+    case Endgame:    return "Эндшпиль";
+    case Tactics:    return "Тактика";
+    case General:    return "Общая подготовка";
     }
     return "Неизвестно";
 }
 
 Specialization::Type Specialization::intToType(int value) {
+    using enum Specialization::Type;
     switch (value) {
-        case 1: return Type::Openings;
-        case 2: return Type::Middlegame;
-        case 3: return Type::Endgame;
-        case 4: return Type::Tactics;
-        default: return Type::General;
+    case 1: return Openings;
+    case 2: return Middlegame;
+    case 3: return Endgame;
+    case 4: return Tactics;
+    default: return General;
     }
 }
 

@@ -5,7 +5,7 @@ class MatchResult {
 public:
     enum class Result { NotPlayed = -1, Draw = 0, WhiteWin = 1, BlackWin = 2 };
     MatchResult();
-    MatchResult(Result result);
+    explicit MatchResult(Result result);
     Result getResult() const;
     void setResult(Result newResult);
     bool isPlayed() const;

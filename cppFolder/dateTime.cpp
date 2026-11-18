@@ -1,7 +1,6 @@
 #include "dateTime.h"
 #include "exceptions/exception.h"
-#include <iomanip>
-#include <sstream>
+#include <format>
 
 DateTime::DateTime() : _day(1), _month(1), _year(2026), _hour(0), _minute(0), _second(0) {}
 
@@ -21,10 +20,8 @@ int DateTime::getDaysInMonth(int month, int year) const {
 }
 
 std::string DateTime::toString() const {
-    std::ostringstream oss;
-    oss << std::setfill('0') << std::setw(2) << _day << "." << std::setw(2) << _month << "." << _year
-        << " " << std::setw(2) << _hour << ":" << std::setw(2) << _minute << ":" << std::setw(2) << _second;
-    return oss.str();
+    return std::format("{:02d}.{:02d}.{:02d} {:02d}:{:02d}:{:02d}",
+                       _day, _month, _year, _hour, _minute, _second);
 }
 
 bool DateTime::operator<(const DateTime& other) const {

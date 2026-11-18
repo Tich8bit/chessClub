@@ -23,9 +23,9 @@ using namespace std;
 
 namespace {
 
-const char *STATE_FILE  = "club.txt";
-const char *LOG_FILE    = "journal.log";
-const char *REPORT_FILE = "report.txt";
+constexpr auto STATE_FILE  = "club.txt";
+constexpr auto LOG_FILE    = "journal.log";
+constexpr auto REPORT_FILE = "report.txt";
 
 void logAction(const string &action) {
     try {

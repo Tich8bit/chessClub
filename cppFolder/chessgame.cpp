@@ -1,6 +1,8 @@
 #include "chessgame.h"
 
+#include <algorithm>
 #include <cctype>
+#include <exception>
 
 #include "chess.hpp"
 
@@ -19,15 +21,18 @@ namespace {
 
 ChessGame::EndReason mapReason(chess::GameResultReason reason)
 {
+    using enum ChessGame::EndReason;
+    using enum chess::GameResultReason;
+
     switch (reason) {
-    case chess::GameResultReason::CHECKMATE:             return ChessGame::EndReason::Checkmate;
-    case chess::GameResultReason::STALEMATE:             return ChessGame::EndReason::Stalemate;
-    case chess::GameResultReason::INSUFFICIENT_MATERIAL: return ChessGame::EndReason::InsufficientMaterial;
-    case chess::GameResultReason::FIFTY_MOVE_RULE:       return ChessGame::EndReason::FiftyMoves;
-    case chess::GameResultReason::THREEFOLD_REPETITION:  return ChessGame::EndReason::Repetition;
-    case chess::GameResultReason::NONE:                  break;
+    case CHECKMATE:             return Checkmate;
+    case STALEMATE:             return Stalemate;
+    case INSUFFICIENT_MATERIAL: return InsufficientMaterial;
+    case FIFTY_MOVE_RULE:       return FiftyMoves;
+    case THREEFOLD_REPETITION:  return Repetition;
+    case NONE:                  break;
     }
-    return ChessGame::EndReason::None;
+    return None;
 }
 
 } // namespace
@@ -58,16 +63,16 @@ bool ChessGame::makeMove(const std::string& uci)
         _impl->moves.push_back(move);
         _impl->uciMoves.push_back(chess::uci::moveToUci(move));
 
-        const auto over = _impl->board.isGameOver();
-        if (over.second == chess::GameResult::NONE) {
+        const auto [resultReason, result] = _impl->board.isGameOver();
+        if (result == chess::GameResult::NONE) {
             _impl->status = Status::InProgress;
             _impl->reason = EndReason::None;
             return true;
         }
 
-        _impl->reason = mapReason(over.first);
+        _impl->reason = mapReason(resultReason);
 
-        if (over.first == chess::GameResultReason::CHECKMATE) {
+        if (resultReason == chess::GameResultReason::CHECKMATE) {
             _impl->status = Status::Checkmate;
             // Ход сделан, значит под матом сторона, которая должна ходить.
             if (_impl->board.sideToMove() == chess::Color::WHITE) {
@@ -80,7 +85,8 @@ bool ChessGame::makeMove(const std::string& uci)
         }
 
         return true;
-    } catch (...) {
+    } catch (const std::exception&) {
+        // Нелегальный ход (UCI-синтаксис, позиция) — отклоняем.
         return false;
     }
 }
@@ -197,16 +203,16 @@ char ChessGame::pieceAt(int square) const
         return '.';
     }
 
-    const int type = static_cast<int>(piece.type());
+    const auto type = piece.type();
     char c = '?';
 
-    if (type == static_cast<int>(chess::PieceType::PAWN))        c = 'p';
-    else if (type == static_cast<int>(chess::PieceType::KNIGHT)) c = 'n';
-    else if (type == static_cast<int>(chess::PieceType::BISHOP)) c = 'b';
-    else if (type == static_cast<int>(chess::PieceType::ROOK))   c = 'r';
-    else if (type == static_cast<int>(chess::PieceType::QUEEN))  c = 'q';
-    else if (type == static_cast<int>(chess::PieceType::KING))   c = 'k';
-    else                                                         return '.';
+    if (type == chess::PieceType::PAWN)        c = 'p';
+    else if (type == chess::PieceType::KNIGHT) c = 'n';
+    else if (type == chess::PieceType::BISHOP) c = 'b';
+    else if (type == chess::PieceType::ROOK)   c = 'r';
+    else if (type == chess::PieceType::QUEEN)  c = 'q';
+    else if (type == chess::PieceType::KING)   c = 'k';
+    else                                      return '.';
 
     return piece.color() == chess::Color::WHITE ? static_cast<char>(std::toupper(c)) : c;
 }
@@ -225,10 +231,7 @@ int ChessGame::kingSquare(bool white) const
 
 bool ChessGame::replay(const std::vector<std::string>& moves)
 {
-    for (const auto& uci : moves) {
-        if (!makeMove(uci)) {
-            return false;
-        }
-    }
-    return true;
+    return std::ranges::all_of(moves, [this](const std::string& uci) {
+        return makeMove(uci);
+    });
 }

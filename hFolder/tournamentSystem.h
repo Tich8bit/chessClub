@@ -14,7 +14,7 @@ public:
 
 class RoundRobinSystem : public TournamentSystem {
 public:
-    RoundRobinSystem(int circlesCount = 1, bool alternateColors = true);
+    explicit RoundRobinSystem(int circlesCount = 1, bool alternateColors = true);
     std::string getName() const override;
     int getTypeId() const override;
     int calculateOptimalRounds(int maxPlayers) const override;
@@ -26,7 +26,7 @@ private:
 
 class SwissSystem : public TournamentSystem {
 public:
-    SwissSystem(int roundsCount = 5, bool avoidRematches = true);
+    explicit SwissSystem(int roundsCount = 5, bool avoidRematches = true);
     std::string getName() const override;
     int getTypeId() const override;
     int calculateOptimalRounds(int maxPlayers) const override;
@@ -38,7 +38,7 @@ private:
 
 class KnockoutSystem : public TournamentSystem {
 public:
-    KnockoutSystem(bool hasThirdPlaceMatch = false);
+    explicit KnockoutSystem(bool hasThirdPlaceMatch = false);
     std::string getName() const override;
     int getTypeId() const override;
     int calculateOptimalRounds(int maxPlayers) const override;

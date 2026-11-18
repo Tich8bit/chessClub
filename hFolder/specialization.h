@@ -8,7 +8,7 @@ public:
     enum class RatingType { Classical, Rapid, Blitz, All };
 
     Specialization();
-    Specialization(Type type);
+    explicit Specialization(Type type);
     Type getType() const;
     RatingType getTargetRating() const;
     std::string toString() const;

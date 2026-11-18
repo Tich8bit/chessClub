@@ -19,11 +19,12 @@ double MatchResult::getBlackScore() const {
 }
 
 std::string MatchResult::toString() const {
+    using enum MatchResult::Result;
     switch (_result) {
-        case Result::NotPlayed: return "не сыграна";
-        case Result::Draw: return "ничья";
-        case Result::WhiteWin: return "победа белых";
-        case Result::BlackWin: return "победа чёрных";
+    case NotPlayed: return "не сыграна";
+    case Draw:      return "ничья";
+    case WhiteWin:  return "победа белых";
+    case BlackWin:  return "победа чёрных";
     }
     return "";
 }

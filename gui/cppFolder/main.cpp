@@ -5,7 +5,7 @@
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
-    app.setApplicationName("chessClub");
+    QApplication::setApplicationName("chessClub");
 
     // Спрашиваем режим до создания окна: закрытие крестиком выходит из программы.
     const int mode = MainWindow::startupChoice();
@@ -17,5 +17,5 @@ int main(int argc, char *argv[])
     window.applyStartup(mode);
     window.show();
 
-    return app.exec();
+    return QApplication::exec();
 }

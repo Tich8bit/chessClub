@@ -5,7 +5,7 @@
 
 Match::Match(int id, std::shared_ptr<Player> whitePlayer, std::shared_ptr<Player> blackPlayer, const DateTime& date)
     : _id(id), _whitePlayer(whitePlayer), _blackPlayer(blackPlayer), _date(date),
-      _result(MatchResult::Result::NotPlayed), _game(std::make_shared<ChessGame>()) {
+      _game(std::make_shared<ChessGame>()) {
     if (id <= 0) throw InvalidDataException("ID партии > 0");
     if (!whitePlayer || !blackPlayer) throw InvalidDataException("пустые игроки");
 }

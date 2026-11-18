@@ -48,11 +48,11 @@ public:
     bool removeMatch(int id);
 
     // Архив: скрыть участника, сохранив его партии и историю.
-    bool archivePlayer(int id);
-    bool unarchivePlayer(int id);
+    bool archivePlayer(int id) const;
+    bool unarchivePlayer(int id) const;
 
     // Запись игрока на турнир и обратно.
-    bool enrollPlayer(int tournamentId, int playerId);
+    bool enrollPlayer(int tournamentId, int playerId) const;
     bool withdrawPlayer(int tournamentId, int playerId);
 
     void createMatch(int id, std::shared_ptr<Player> white, std::shared_ptr<Player> black, const DateTime& date);
@@ -67,7 +67,7 @@ public:
     bool playMove(int matchId, const std::string& uci);
     bool resignMatch(int matchId, bool whiteSide);
     bool agreeDraw(int matchId);
-    bool undoMove(int matchId);
+    bool undoMove(int matchId) const;
 
     std::vector<std::shared_ptr<Member>> sortedPlayers(SortKey key, bool ascending = true) const;
 
@@ -76,10 +76,10 @@ public:
 
     // Перенумеровывает участников, события и партии как 1..N
     // и обновляет ссылки (турнир у партии).
-    void renumberIds();
+    void renumberIds() const;
 
     // Пересчитывает В/Н/П по сыгранным партиям (партии — источник правды).
-    void recalculateStatistics();
+    void recalculateStatistics() const;
 
     void printAllPlayers() const;
     void printAllEvents() const;

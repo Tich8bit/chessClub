@@ -70,6 +70,7 @@ std::vector<Standing> Tournament::getStandings(bool useHeadToHead) const {
     std::map<std::shared_ptr<Member>, Standing> table;
     for (const auto& p : _participants) table[p] = {p, 0, 0, 0, 0.0};
 
+    using enum MatchResult::Result;
     for (const auto& m : _matches) {
         auto res = m->getResult();
         if (!res.isPlayed()) continue;
@@ -77,9 +78,9 @@ std::vector<Standing> Tournament::getStandings(bool useHeadToHead) const {
         auto b = std::static_pointer_cast<Member>(m->getBlackPlayer());
         table[w].points += res.getWhiteScore();
         table[b].points += res.getBlackScore();
-        if (res.getResult() == MatchResult::Result::WhiteWin) { table[w].wins++; table[b].losses++; }
-        else if (res.getResult() == MatchResult::Result::BlackWin) { table[b].wins++; table[w].losses++; }
-        else if (res.getResult() == MatchResult::Result::Draw) { table[w].draws++; table[b].draws++; }
+        if (res.getResult() == WhiteWin) { table[w].wins++; table[b].losses++; }
+        else if (res.getResult() == BlackWin) { table[b].wins++; table[w].losses++; }
+        else if (res.getResult() == Draw) { table[w].draws++; table[b].draws++; }
     }
 
     std::vector<Standing> standings;
