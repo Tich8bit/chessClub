@@ -310,9 +310,9 @@ void StorageManager::loadMatch(std::ifstream& ifs, ChessClub& club, bool withTou
         } else {
             match->setGame(nullptr);
         }
-    } else if (!withMoves) {
-        // Старый формат: истории ходов нет.
-        match->setGame(nullptr);
+    } else {
+        // Создаём новую игровую доску для партий без истории ходов
+        match->setGame(std::make_shared<ChessGame>());
     }
 
     club.addMatch(match);
