@@ -8,8 +8,8 @@
 #include <iostream>
 #include <sstream>
 
-#include "coach.h"
 #include "chessgame.h"
+#include "coach.h"
 #include "exceptions/exception.h"
 #include "matchResult.h"
 #include "player.h"
@@ -38,7 +38,7 @@ void StorageManager::savePlayers(std::ofstream& ofs, const ChessClub& club) {
         auto middleName = std::string(p->getMiddleName());
 
         if (auto coach = std::dynamic_pointer_cast<Coach>(p)) {
-            int specInt = std::to_underlying(coach->getSpecialization().getType());
+            int specInt = static_cast<int>(coach->getSpecialization().getType());
             ofs << PREFIX_COACH << " " << coach->getId() << " " << std::quoted(lastName) << " "
                 << std::quoted(firstName) << " " << std::quoted(middleName) << " "
                 << p->getRatings().getClassical() << " " << p->getRatings().getRapid() << " "
@@ -64,7 +64,7 @@ void StorageManager::saveEvents(std::ofstream& ofs, const ChessClub& club) {
         if (auto t = std::dynamic_pointer_cast<Tournament>(e)) {
             auto title = std::string(t->getTitle());
             ofs << PREFIX_TOURNAMENT << " " << t->getId() << " " << std::quoted(title) << " "
-                << std::to_underlying(t->getTimeControl()) << " " << t->getSystem()->getTypeId() << " "
+                << static_cast<int>(t->getTimeControl()) << " " << t->getSystem()->getTypeId() << " "
                 << t->getMaxPlayers() << " " << t->getParticipants().size();
 
             for (const auto& participant : t->getParticipants()) {
@@ -94,7 +94,7 @@ void StorageManager::saveMatches(std::ofstream& ofs, const ChessClub& club) {
 
         ofs << PREFIX_MATCH << " " << m->getId() << " " << m->getWhitePlayer()->getId() << " "
             << m->getBlackPlayer()->getId() << " " << std::quoted(m->getDate().toString()) << " "
-            << std::to_underlying(m->getResult().getResult()) << " "
+            << static_cast<int>(m->getResult().getResult()) << " "
             << m->getTournamentId() << " " << moves.size();
 
         for (const auto& uci : moves) {
@@ -111,7 +111,6 @@ void StorageManager::loadState(const std::string& filename, ChessClub& club) {
     std::string header;
     ifs >> header;
 
-    // CHESSDB4 — ходы партий, CHESSDB3 — архив, CHESSDB2 — ссылки на турниры.
     const bool withMoves = (header == "CHESSDB4");
     const bool withArchive = withMoves || (header == "CHESSDB3");
     const bool withExtras = withArchive || (header == "CHESSDB2");
@@ -146,7 +145,6 @@ void StorageManager::loadState(const std::string& filename, ChessClub& club) {
 
     if (!ifs) throw InvalidDataException("файл повреждён: неожиданный конец данных");
 
-    // Приводим идентификаторы к 1..N и пересчитываем статистику из партий.
     club.renumberIds();
     club.recalculateStatistics();
 }
@@ -220,7 +218,6 @@ void StorageManager::loadTournament(std::ifstream& ifs, ChessClub& club, bool wi
                 try {
                     *tournament += member;
                 } catch (const ChessException&) {
-                    // Лимит участников меньше сохранённого — пропускаем.
                 }
             }
         }
@@ -312,7 +309,6 @@ void StorageManager::loadMatch(std::ifstream& ifs, ChessClub& club, bool withTou
             match->setGame(nullptr);
         }
     } else {
-        // Создаём новую игровую доску для партий без истории ходов
         match->setGame(std::make_shared<ChessGame>());
     }
 
@@ -433,8 +429,8 @@ void StorageManager::logAction(const std::string& logFilename, const std::string
     if (!ofs.is_open()) throw InvalidOperationException("не удалось открыть лог-файл");
 
     const auto now = std::chrono::system_clock::now();
-    std::tm timeInfo{};
-    localtime_s(&timeInfo, std::chrono::system_clock::to_time_t(now));
+    const std::time_t tt = std::chrono::system_clock::to_time_t(now);
+    const std::tm timeInfo = *std::localtime(&tt);
 
     const std::string timestamp = std::format("{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}",
                                               timeInfo.tm_year + 1900, timeInfo.tm_mon + 1, timeInfo.tm_mday,

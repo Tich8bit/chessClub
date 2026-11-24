@@ -1,45 +1,71 @@
 #include "chessgame.h"
 
-#include <algorithm>
-#include <cctype>
-#include <exception>
+#include <string>
+#include <vector>
 
-#include "chess.hpp"
+#include "chessboard.h"
+#include "chessmove.h"
+#include "chesspiece.h"
 
 struct ChessGame::Impl {
-    chess::Board board;
-    std::vector<chess::Move> moves;
+    ChessBoard board;
     std::vector<std::string> uciMoves;
 
     Status status = Status::InProgress;
     EndReason reason = EndReason::None;
     bool whiteWon = false;
     bool blackWon = false;
-};
 
-namespace {
-
-ChessGame::EndReason mapReason(chess::GameResultReason reason)
-{
-    using enum ChessGame::EndReason;
-    using enum chess::GameResultReason;
-
-    switch (reason) {
-    case CHECKMATE:             return Checkmate;
-    case STALEMATE:             return Stalemate;
-    case INSUFFICIENT_MATERIAL: return InsufficientMaterial;
-    case FIFTY_MOVE_RULE:       return FiftyMoves;
-    case THREEFOLD_REPETITION:  return Repetition;
-    case NONE:                  break;
+    void resetState()
+    {
+        board.reset();
+        uciMoves.clear();
+        status = Status::InProgress;
+        reason = EndReason::None;
+        whiteWon = false;
+        blackWon = false;
     }
-    return None;
-}
 
-} // namespace
+    void updateEndState()
+    {
+        if (status == Status::Resigned || (status == Status::Draw && reason == EndReason::Agreement)) {
+            return;
+        }
+
+        const auto state = board.evaluateState();
+        if (state == ChessBoard::PositionState::Checkmate) {
+            status = Status::Checkmate;
+            reason = EndReason::Checkmate;
+            if (board.whiteToMove()) {
+                whiteWon = false;
+                blackWon = true;
+            } else {
+                whiteWon = true;
+                blackWon = false;
+            }
+        } else if (state == ChessBoard::PositionState::Stalemate) {
+            status = Status::Draw;
+            reason = EndReason::Stalemate;
+            whiteWon = false;
+            blackWon = false;
+        } else if (state == ChessBoard::PositionState::InsufficientMaterial) {
+            status = Status::Draw;
+            reason = EndReason::InsufficientMaterial;
+            whiteWon = false;
+            blackWon = false;
+        } else {
+            status = Status::InProgress;
+            reason = EndReason::None;
+            whiteWon = false;
+            blackWon = false;
+        }
+    }
+};
 
 ChessGame::ChessGame()
     : _impl(std::make_unique<Impl>())
 {
+    _impl->resetState();
 }
 
 ChessGame::~ChessGame() = default;
@@ -50,62 +76,32 @@ bool ChessGame::makeMove(const std::string& uci)
         return false;
     }
 
-    try {
-        const chess::Move move = chess::uci::uciToMove(_impl->board, uci);
-        if (move == chess::Move::NO_MOVE) {
-            return false;
-        }
-        if (!_impl->board.isLegal(move)) {
-            return false;
-        }
-
-        _impl->board.makeMove(move);
-        _impl->moves.push_back(move);
-        _impl->uciMoves.push_back(chess::uci::moveToUci(move));
-
-        const auto [resultReason, result] = _impl->board.isGameOver();
-        if (result == chess::GameResult::NONE) {
-            _impl->status = Status::InProgress;
-            _impl->reason = EndReason::None;
-            return true;
-        }
-
-        _impl->reason = mapReason(resultReason);
-
-        if (resultReason == chess::GameResultReason::CHECKMATE) {
-            _impl->status = Status::Checkmate;
-            // Ход сделан, значит под матом сторона, которая должна ходить.
-            if (_impl->board.sideToMove() == chess::Color::WHITE) {
-                _impl->blackWon = true;
-            } else {
-                _impl->whiteWon = true;
-            }
-        } else {
-            _impl->status = Status::Draw;
-        }
-
-        return true;
-    } catch (const std::exception&) {
-        // Нелегальный ход (UCI-синтаксис, позиция) — отклоняем.
+    const ChessMove move = ChessMove::fromUci(uci);
+    if (move.from < 0 || move.to < 0) {
         return false;
     }
+
+    if (!_impl->board.makeMove(move)) {
+        return false;
+    }
+
+    _impl->uciMoves.push_back(move.toUci());
+    _impl->updateEndState();
+    return true;
 }
 
 bool ChessGame::undoMove()
 {
-    if (_impl->moves.empty() || _impl->status == Status::Resigned) {
+    if (_impl->uciMoves.empty() || _impl->status == Status::Resigned) {
         return false;
     }
 
-    _impl->board.unmakeMove(_impl->moves.back());
-    _impl->moves.pop_back();
+    if (!_impl->board.undoMove()) {
+        return false;
+    }
+
     _impl->uciMoves.pop_back();
-
-    _impl->status = Status::InProgress;
-    _impl->reason = EndReason::None;
-    _impl->whiteWon = false;
-    _impl->blackWon = false;
-
+    _impl->updateEndState();
     return true;
 }
 
@@ -127,6 +123,8 @@ void ChessGame::agreeDraw()
     }
     _impl->status = Status::Draw;
     _impl->reason = EndReason::Agreement;
+    _impl->whiteWon = false;
+    _impl->blackWon = false;
 }
 
 bool ChessGame::isOver() const
@@ -156,34 +154,31 @@ bool ChessGame::blackWon() const
 
 bool ChessGame::inCheck() const
 {
-    return _impl->board.inCheck();
+    return _impl->board.inCheck(_impl->board.whiteToMove());
 }
 
 bool ChessGame::whiteToMove() const
 {
-    return _impl->board.sideToMove() == chess::Color::WHITE;
+    return _impl->board.whiteToMove();
 }
 
 std::string ChessGame::fen() const
 {
-    return _impl->board.getFen();
+    return _impl->board.toFen();
 }
 
 std::vector<std::string> ChessGame::legalMoves() const
 {
     std::vector<std::string> result;
-
     if (isOver()) {
         return result;
     }
 
-    chess::Movelist moves;
-    chess::movegen::legalmoves(moves, _impl->board);
-
-    for (const auto& move : moves) {
-        result.push_back(chess::uci::moveToUci(move));
+    const auto moves = _impl->board.legalMoves();
+    result.reserve(moves.size());
+    for (const auto& m : moves) {
+        result.push_back(m.toUci());
     }
-
     return result;
 }
 
@@ -194,44 +189,21 @@ const std::vector<std::string>& ChessGame::history() const
 
 char ChessGame::pieceAt(int square) const
 {
-    if (square < 0 || square >= 64) {
-        return '.';
-    }
-
-    const auto piece = _impl->board.at(chess::Square(square));
-    if (piece == chess::Piece::NONE) {
-        return '.';
-    }
-
-    const auto type = piece.type();
-    char c = '?';
-
-    if (type == chess::PieceType::PAWN)        c = 'p';
-    else if (type == chess::PieceType::KNIGHT) c = 'n';
-    else if (type == chess::PieceType::BISHOP) c = 'b';
-    else if (type == chess::PieceType::ROOK)   c = 'r';
-    else if (type == chess::PieceType::QUEEN)  c = 'q';
-    else if (type == chess::PieceType::KING)   c = 'k';
-    else                                      return '.';
-
-    return piece.color() == chess::Color::WHITE ? static_cast<char>(std::toupper(c)) : c;
+    return _impl->board.pieceAt(square).toChar();
 }
 
 int ChessGame::kingSquare(bool white) const
 {
-    for (int square = 0; square < 64; ++square) {
-        const auto piece = _impl->board.at(chess::Square(square));
-        if (piece != chess::Piece::NONE && piece.type() == chess::PieceType::KING
-            && piece.color() == (white ? chess::Color::WHITE : chess::Color::BLACK)) {
-            return square;
-        }
-    }
-    return -1;
+    return _impl->board.kingSquare(white);
 }
 
 bool ChessGame::replay(const std::vector<std::string>& moves)
 {
-    return std::ranges::all_of(moves, [this](const std::string& uci) {
-        return makeMove(uci);
-    });
+    _impl->resetState();
+    for (const auto& uci : moves) {
+        if (!makeMove(uci)) {
+            return false;
+        }
+    }
+    return true;
 }

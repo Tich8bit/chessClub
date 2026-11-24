@@ -1,6 +1,7 @@
 #include "chessClub.h"
 
 #include <algorithm>
+#include <iostream>
 #include <map>
 #include <stdexcept>
 #include <utility>
@@ -204,7 +205,6 @@ bool ChessClub::withdrawPlayer(int tournamentId, int playerId)
         return false;
     }
 
-    // Партии снявшегося игрока удаляем: иначе он «вернётся» в таблицу через матчи.
     std::vector<int> matchIds;
     for (const auto& match : tournament->getMatches()) {
         if (match->getWhitePlayer()->getId() == playerId
@@ -256,7 +256,6 @@ bool ChessClub::setMatchResult(int matchId, MatchResult::Result result, int kOve
         return false;
     }
 
-    // Если партия ведётся ходами, результат руками не вводится.
     if (match->hasGame()) {
         return false;
     }
@@ -284,7 +283,7 @@ void ChessClub::applyElo(Match& match, int kOverride)
             discipline = Elo::Discipline::Classical;
             break;
         }
-        k = Elo::kFactor(std::to_underlying(tournament->getTimeControl()));
+        k = Elo::kFactor(static_cast<int>(tournament->getTimeControl()));
     }
 
     if (kOverride > 0) {
@@ -366,7 +365,7 @@ bool ChessClub::undoMove(int matchId) const
     return match->game()->undoMove();
 }
 
-void ChessClub::recalculateStatistics() const
+void ChessClub::recalculateStatistics()
 {
     for (const auto& member : _players) {
         member->resetStatistics();
@@ -420,7 +419,7 @@ std::vector<std::shared_ptr<Match>> ChessClub::matchesOfPlayer(int playerId) con
     return result;
 }
 
-void ChessClub::renumberIds() const
+void ChessClub::renumberIds()
 {
     std::map<int, int> eventMap;
 

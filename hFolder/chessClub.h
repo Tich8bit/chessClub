@@ -12,7 +12,6 @@
 #include "member.h"
 #include "tournament.h"
 
-// Ключ сортировки списка участников.
 enum class SortKey { ById, ByName, ByRating, ByScore };
 
 class ChessClub {
@@ -28,7 +27,6 @@ public:
     const Collection<Event>& getEvents() const;
     const Collection<Match>& getMatches() const;
 
-    // Следующий свободный идентификатор.
     int nextPlayerId() const;
     int nextEventId() const;
     int nextMatchId() const;
@@ -42,28 +40,22 @@ public:
     std::shared_ptr<Match> findMatchById(int id) const;
     std::shared_ptr<Tournament> findTournamentById(int id) const;
 
-    // Удаление с очисткой связей. Возвращает false, если объекта не было.
     bool removePlayer(int id);
     bool removeEvent(int id);
     bool removeMatch(int id);
 
-    // Архив: скрыть участника, сохранив его партии и историю.
     bool archivePlayer(int id) const;
     bool unarchivePlayer(int id) const;
 
-    // Запись игрока на турнир и обратно.
     bool enrollPlayer(int tournamentId, int playerId) const;
     bool withdrawPlayer(int tournamentId, int playerId);
 
     void createMatch(int id, std::shared_ptr<Player> white, std::shared_ptr<Player> black, const DateTime& date);
 
-    // Создаёт партию внутри турнира; оба игрока должны быть записаны.
     bool createMatchInTournament(int matchId, int tournamentId, int whiteId, int blackId, const DateTime& date);
 
-    // Фиксирует результат партии и пересчитывает Эло. Повторно нельзя.
     bool setMatchResult(int matchId, MatchResult::Result result, int kOverride = 0);
 
-    // Ходы в партии (UCI: "e2e4"). Результат появляется автоматически, когда игра окончена.
     bool playMove(int matchId, const std::string& uci);
     bool resignMatch(int matchId, bool whiteSide);
     bool agreeDraw(int matchId);
@@ -71,15 +63,11 @@ public:
 
     std::vector<std::shared_ptr<Member>> sortedPlayers(SortKey key, bool ascending = true) const;
 
-    // Все партии участника (в турнирах и вне их).
     std::vector<std::shared_ptr<Match>> matchesOfPlayer(int playerId) const;
 
-    // Перенумеровывает участников, события и партии как 1..N
-    // и обновляет ссылки (турнир у партии).
-    void renumberIds() const;
+    void renumberIds();
 
-    // Пересчитывает В/Н/П по сыгранным партиям (партии — источник правды).
-    void recalculateStatistics() const;
+    void recalculateStatistics();
 
     void printAllPlayers() const;
     void printAllEvents() const;
