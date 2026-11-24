@@ -2,7 +2,9 @@
 
 #include <QAction>
 #include <QApplication>
-#include <QCheckBox>
+#include <QCalendarWidget>
+#include <QComboBox>
+#include <QDateEdit>
 #include <QDialog>
 #include <QDir>
 #include <QFile>
@@ -37,6 +39,7 @@
 #include "specialization.h"
 #include "tournament.h"
 #include "tournamentSystem.h"
+#include "trainingSession.h"
 
 namespace {
 
@@ -48,6 +51,15 @@ QString timeControlName(Tournament::TimeControl control)
     case Tournament::TimeControl::Classic: return "Классика";
     }
     return "?";
+}
+
+QString matchStatusLabel(const Match &match)
+{
+    const QString rawResult = QString::fromStdString(match.getResult().toString());
+    if (match.getResult().isPlayed()) {
+        return rawResult.isEmpty() ? QString("Сыграна") : QString("Сыграна (%1)").arg(rawResult);
+    }
+    return "Не сыграна";
 }
 
 constexpr auto STATE_FILE  = "club.txt";
@@ -88,6 +100,11 @@ void createTestClub(ChessClub &club)
     *tournament += p1;
     *tournament += p2;
     club.addEvent(tournament);
+
+    auto training = std::make_shared<TrainingSession>(
+        2, "Тактика и эндшпиль", "Связанные проходные", 90, c1);
+    *training += p1;
+    club.addEvent(training);
 
     auto match = std::make_shared<Match>(1, p1, p2, DateTime(1, 11, 2026, 14, 30, 0));
     match->setTournamentId(1);
@@ -188,18 +205,14 @@ void MainWindow::buildUi()
 
     {
         auto *page = buildTableTab(_playersTab,
-            {"ID", "ФИО", "Классика", "Рапид", "Блиц", "В", "Н", "П", "Очки"});
+            {"ID", "ФИО", "Классика", "Рапид", "Блиц", "В", "Н", "П"});
 
         auto *buttons = new QHBoxLayout;
         auto *add = new QPushButton("Добавить", page);
         auto *remove = new QPushButton("Удалить", page);
         auto *history = new QPushButton("История матчей", page);
-        auto *archive = new QPushButton("В архив", page);
-        auto *restore = new QPushButton("Из архива", page);
         buttons->addWidget(add);
         buttons->addWidget(remove);
-        buttons->addWidget(archive);
-        buttons->addWidget(restore);
         buttons->addWidget(history);
         buttons->addStretch();
 
@@ -207,12 +220,6 @@ void MainWindow::buildUi()
         connect(add, &QPushButton::clicked, this, &MainWindow::addPlayer);
         connect(remove, &QPushButton::clicked, this, &MainWindow::deletePlayer);
         connect(history, &QPushButton::clicked, this, &MainWindow::showPlayerHistory);
-        connect(archive, &QPushButton::clicked, this, [this]() {
-            setArchivedForSelected(_playersTab, true);
-        });
-        connect(restore, &QPushButton::clicked, this, [this]() {
-            setArchivedForSelected(_playersTab, false);
-        });
 
         _tabs->addTab(page, "Игроки");
     }
@@ -224,23 +231,13 @@ void MainWindow::buildUi()
         auto *buttons = new QHBoxLayout;
         auto *add = new QPushButton("Добавить", page);
         auto *remove = new QPushButton("Удалить", page);
-        auto *archive = new QPushButton("В архив", page);
-        auto *restore = new QPushButton("Из архива", page);
         buttons->addWidget(add);
         buttons->addWidget(remove);
-        buttons->addWidget(archive);
-        buttons->addWidget(restore);
         buttons->addStretch();
 
         qobject_cast<QVBoxLayout *>(page->layout())->addLayout(buttons);
         connect(add, &QPushButton::clicked, this, &MainWindow::addCoach);
         connect(remove, &QPushButton::clicked, this, &MainWindow::deleteCoach);
-        connect(archive, &QPushButton::clicked, this, [this]() {
-            setArchivedForSelected(_coachesTab, true);
-        });
-        connect(restore, &QPushButton::clicked, this, [this]() {
-            setArchivedForSelected(_coachesTab, false);
-        });
 
         _tabs->addTab(page, "Тренеры");
     }
@@ -273,8 +270,35 @@ void MainWindow::buildUi()
     }
 
     {
+        auto *page = buildTableTab(_trainingsTab,
+            {"ID", "Название", "Тема", "Тренер", "Длительность (мин)", "Участники"});
+
+        auto *buttons = new QHBoxLayout;
+        auto *add = new QPushButton("Добавить", page);
+        auto *remove = new QPushButton("Удалить", page);
+        auto *enroll = new QPushButton("Записать участника", page);
+        auto *withdraw = new QPushButton("Снять", page);
+        auto *details = new QPushButton("Состав и детали", page);
+        buttons->addWidget(add);
+        buttons->addWidget(remove);
+        buttons->addWidget(enroll);
+        buttons->addWidget(withdraw);
+        buttons->addWidget(details);
+        buttons->addStretch();
+
+        qobject_cast<QVBoxLayout *>(page->layout())->addLayout(buttons);
+        connect(add, &QPushButton::clicked, this, &MainWindow::addTraining);
+        connect(remove, &QPushButton::clicked, this, &MainWindow::deleteTraining);
+        connect(enroll, &QPushButton::clicked, this, &MainWindow::enrollTrainingPlayer);
+        connect(withdraw, &QPushButton::clicked, this, &MainWindow::withdrawTrainingPlayer);
+        connect(details, &QPushButton::clicked, this, &MainWindow::showTrainingDetails);
+
+        _tabs->addTab(page, "Тренировки");
+    }
+
+    {
         auto *page = buildTableTab(_matchesTab,
-            {"ID", "Белые", "Чёрные", "Дата", "Результат", "Турнир"});
+            {"ID", "Белые", "Чёрные", "Дата", "Статус", "Турнир"}, true);
 
         auto *buttons = new QHBoxLayout;
         auto *add = new QPushButton("Создать", page);
@@ -297,7 +321,7 @@ void MainWindow::buildUi()
     }
 }
 
-QWidget *MainWindow::buildTableTab(Tab &tab, const QStringList &headers)
+QWidget *MainWindow::buildTableTab(Tab &tab, const QStringList &headers, bool withMatchStatusFilter)
 {
     Q_UNUSED(headers);
 
@@ -320,16 +344,23 @@ QWidget *MainWindow::buildTableTab(Tab &tab, const QStringList &headers)
     tab.filter = new QLineEdit;
     tab.filter->setPlaceholderText("Фильтр по таблице...");
 
-    tab.showArchive = new QCheckBox("Показывать архив");
-    tab.showArchive->setChecked(false);
-
     auto *page = new QWidget;
     auto *layout = new QVBoxLayout(page);
     layout->addWidget(tab.filter);
-    layout->addWidget(tab.showArchive);
-    layout->addWidget(tab.view, 1);
 
-    connect(tab.showArchive, &QCheckBox::toggled, this, [this](bool) { refreshAll(); });
+    if (withMatchStatusFilter) {
+        auto *filterRow = new QHBoxLayout;
+        tab.statusFilter = new QComboBox(page);
+        tab.statusFilter->addItem("Все матчи", 0);
+        tab.statusFilter->addItem("Несыгранные", 1);
+        tab.statusFilter->addItem("Сыгранные", 2);
+        filterRow->addWidget(tab.statusFilter);
+        filterRow->addStretch();
+        layout->addLayout(filterRow);
+        connect(tab.statusFilter, &QComboBox::currentIndexChanged, this, [this]() { refreshMatches(); });
+    }
+
+    layout->addWidget(tab.view, 1);
 
     Tab *tabPtr = &tab;
     connect(tab.filter, &QLineEdit::textChanged, this, [tabPtr](const QString &text) {
@@ -397,26 +428,23 @@ void MainWindow::refreshAll()
     refreshPlayers();
     refreshCoaches();
     refreshTournaments();
+    refreshTrainings();
     refreshMatches();
 }
 
 void MainWindow::refreshPlayers()
 {
     QVector<ChessTableModel::Row> rows;
-    const bool showArchived = _playersTab.showArchive && _playersTab.showArchive->isChecked();
 
     for (const auto &member : _club->getPlayers()) {
         auto player = std::dynamic_pointer_cast<Player>(member);
         if (!player) {
             continue;
         }
-        if (player->isArchived() && !showArchived) {
-            continue;
-        }
 
         ChessTableModel::Row row;
         row.id = player->getId();
-        row.muted = player->isArchived();
+        row.muted = false;
         row.text = {
             QString::number(player->getId()),
             QString::fromStdString(player->getFullName()),
@@ -425,8 +453,7 @@ void MainWindow::refreshPlayers()
             QString::number(player->getRatings().getBlitz()),
             QString::number(player->getWins()),
             QString::number(player->getDraws()),
-            QString::number(player->getLosses()),
-            QString::number(player->getScore(), 'f', 2)
+            QString::number(player->getLosses())
         };
         row.values = {
             player->getId(),
@@ -436,33 +463,28 @@ void MainWindow::refreshPlayers()
             player->getRatings().getBlitz(),
             player->getWins(),
             player->getDraws(),
-            player->getLosses(),
-            player->getScore()
+            player->getLosses()
         };
         rows.push_back(row);
     }
 
     _playersTab.model->resetRows(
-        {"ID", "ФИО", "Классика", "Рапид", "Блиц", "В", "Н", "П", "Очки"}, rows);
+        {"ID", "ФИО", "Классика", "Рапид", "Блиц", "В", "Н", "П"}, rows);
 }
 
 void MainWindow::refreshCoaches()
 {
     QVector<ChessTableModel::Row> rows;
-    const bool showArchived = _coachesTab.showArchive && _coachesTab.showArchive->isChecked();
 
     for (const auto &member : _club->getPlayers()) {
         auto coach = std::dynamic_pointer_cast<Coach>(member);
         if (!coach) {
             continue;
         }
-        if (coach->isArchived() && !showArchived) {
-            continue;
-        }
 
         ChessTableModel::Row row;
         row.id = coach->getId();
-        row.muted = coach->isArchived();
+        row.muted = false;
         row.text = {
             QString::number(coach->getId()),
             QString::fromStdString(coach->getFullName()),
@@ -527,11 +549,61 @@ void MainWindow::refreshTournaments()
         {"ID", "Название", "Контроль", "Система", "Участники", "Лимит", "Партии"}, rows);
 }
 
-void MainWindow::refreshMatches()
+void MainWindow::refreshTrainings()
 {
     QVector<ChessTableModel::Row> rows;
 
+    for (const auto &event : _club->getEvents()) {
+        auto training = std::dynamic_pointer_cast<TrainingSession>(event);
+        if (!training) {
+            continue;
+        }
+
+        const QString coachName = training->getCoach()
+            ? QString::fromStdString(training->getCoach()->getFullName())
+            : QString("—");
+
+        ChessTableModel::Row row;
+        row.id = training->getId();
+        row.text = {
+            QString::number(training->getId()),
+            QString::fromStdString(std::string(training->getTitle())),
+            QString::fromStdString(std::string(training->getTopic())),
+            coachName,
+            QString::number(training->getDurationMinutes()),
+            QString::number(training->getParticipants().size())
+        };
+        row.values = {
+            training->getId(),
+            QString::fromStdString(std::string(training->getTitle())),
+            QString::fromStdString(std::string(training->getTopic())),
+            coachName,
+            training->getDurationMinutes(),
+            static_cast<int>(training->getParticipants().size())
+        };
+        rows.push_back(row);
+    }
+
+    _trainingsTab.model->resetRows(
+        {"ID", "Название", "Тема", "Тренер", "Длительность (мин)", "Участники"}, rows);
+}
+
+void MainWindow::refreshMatches()
+{
+    QVector<ChessTableModel::Row> rows;
+    const int filterMode = _matchesTab.statusFilter ? _matchesTab.statusFilter->currentData().toInt() : 0;
+
     for (const auto &match : _club->getMatches()) {
+        const bool played = match->getResult().isPlayed();
+        if (filterMode == 1 && played) {
+            continue;
+        }
+        if (filterMode == 2 && !played) {
+            continue;
+        }
+
+        const QString statusStr = matchStatusLabel(*match);
+
         ChessTableModel::Row row;
         row.id = match->getId();
         row.text = {
@@ -539,7 +611,7 @@ void MainWindow::refreshMatches()
             QString::fromStdString(match->getWhitePlayer()->getFullName()),
             QString::fromStdString(match->getBlackPlayer()->getFullName()),
             QString::fromStdString(match->getDate().toString()),
-            QString::fromStdString(match->getResult().toString()),
+            statusStr,
             match->getTournamentId() > 0 ? QString::number(match->getTournamentId()) : QString("—")
         };
         row.values = {
@@ -547,14 +619,14 @@ void MainWindow::refreshMatches()
             QString::fromStdString(match->getWhitePlayer()->getFullName()),
             QString::fromStdString(match->getBlackPlayer()->getFullName()),
             QString::fromStdString(match->getDate().toString()),
-            QString::fromStdString(match->getResult().toString()),
+            statusStr,
             match->getTournamentId()
         };
         rows.push_back(row);
     }
 
     _matchesTab.model->resetRows(
-        {"ID", "Белые", "Чёрные", "Дата", "Результат", "Турнир"}, rows);
+        {"ID", "Белые", "Чёрные", "Дата", "Статус", "Турнир"}, rows);
 }
 
 int MainWindow::selectedId(const Tab &tab) const
@@ -674,27 +746,6 @@ void MainWindow::showPlayerHistory()
     }
 
     QMessageBox::information(this, "История матчей", header + body);
-}
-
-void MainWindow::setArchivedForSelected(const Tab &tab, bool archived)
-{
-    const int id = selectedId(tab);
-    if (id < 0) {
-        message("Выберите строку в таблице.");
-        return;
-    }
-
-    const bool ok = archived ? _club->archivePlayer(id) : _club->unarchivePlayer(id);
-    if (!ok) {
-        message("Участник не найден.");
-        return;
-    }
-
-    logAction(archived ? QString("в архив ID=%1").arg(id)
-                       : QString("из архива ID=%1").arg(id));
-    refreshAll();
-    statusBar()->showMessage(archived ? "Участник перемещён в архив."
-                                      : "Участник возвращён из архива.", 4000);
 }
 
 void MainWindow::deletePlayer()
@@ -903,9 +954,205 @@ void MainWindow::showStandings()
     QMessageBox::information(this, "Турнирная таблица", text);
 }
 
+void MainWindow::addTraining()
+{
+    bool ok = false;
+    const QString title = QInputDialog::getText(
+        this, "Новая тренировка", "Название тренировки:", QLineEdit::Normal, QString(), &ok);
+    if (!ok || title.trimmed().isEmpty()) {
+        return;
+    }
+
+    const QString topic = QInputDialog::getText(
+        this, "Новая тренировка", "Тема тренировки:", QLineEdit::Normal, "Общая практика", &ok);
+    if (!ok) {
+        return;
+    }
+
+    const int duration = QInputDialog::getInt(
+        this, "Новая тренировка", "Длительность (минут):", 90, 15, 480, 15, &ok);
+    if (!ok) {
+        return;
+    }
+
+    const int coachId = QInputDialog::getInt(
+        this, "Новая тренировка", "ID тренера:", 1, 1, 99999, 1, &ok);
+    if (!ok) {
+        return;
+    }
+
+    auto coach = std::dynamic_pointer_cast<Coach>(_club->findPlayerById(coachId));
+    if (!coach) {
+        message("Тренер с таким ID не найден.");
+        return;
+    }
+
+    try {
+        const int id = _club->nextEventId();
+        _club->addEvent(std::make_shared<TrainingSession>(
+            id, title.trimmed().toStdString(), topic.trimmed().toStdString(),
+            duration, coach));
+
+        logAction(QString("добавлена тренировка ID=%1").arg(id));
+        refreshTrainings();
+        statusBar()->showMessage(QString("Тренировка добавлена, ID %1").arg(id), 4000);
+    } catch (const ChessException &e) {
+        QMessageBox::warning(this, "Ошибка", e.what());
+    }
+}
+
+void MainWindow::deleteTraining()
+{
+    const int id = selectedId(_trainingsTab);
+    if (id < 0) {
+        message("Выберите тренировку в таблице.");
+        return;
+    }
+
+    if (QMessageBox::question(this, "Удаление", QString("Удалить тренировку ID %1?").arg(id))
+        != QMessageBox::Yes) {
+        return;
+    }
+
+    if (_club->removeEvent(id)) {
+        logAction(QString("удалена тренировка ID=%1").arg(id));
+        refreshTrainings();
+        statusBar()->showMessage("Удалено.", 4000);
+    } else {
+        message("Тренировка не найдена.");
+    }
+}
+
+void MainWindow::enrollTrainingPlayer()
+{
+    const int trainingId = selectedId(_trainingsTab);
+    if (trainingId < 0) {
+        message("Выберите тренировку в таблице.");
+        return;
+    }
+
+    bool ok = false;
+    const int playerId = QInputDialog::getInt(
+        this, "Запись на тренировку", "ID участника:", 1, 1, 99999, 1, &ok);
+    if (!ok) {
+        return;
+    }
+
+    if (_club->enrollPlayer(trainingId, playerId)) {
+        logAction(QString("запись участника %1 на тренировку %2").arg(playerId).arg(trainingId));
+        refreshTrainings();
+        statusBar()->showMessage("Участник записан на тренировку.", 4000);
+        return;
+    }
+
+    std::shared_ptr<TrainingSession> training;
+    for (const auto &event : _club->getEvents()) {
+        auto candidate = std::dynamic_pointer_cast<TrainingSession>(event);
+        if (candidate && candidate->getId() == trainingId) {
+            training = candidate;
+            break;
+        }
+    }
+
+    auto member = _club->findPlayerById(playerId);
+    if (training && member) {
+        *training += member;
+        logAction(QString("запись участника %1 на тренировку %2").arg(playerId).arg(trainingId));
+        refreshTrainings();
+        statusBar()->showMessage("Участник записан на тренировку.", 4000);
+    } else {
+        message("Не удалось записать участника (проверьте ID).");
+    }
+}
+
+void MainWindow::withdrawTrainingPlayer()
+{
+    const int trainingId = selectedId(_trainingsTab);
+    if (trainingId < 0) {
+        message("Выберите тренировку в таблице.");
+        return;
+    }
+
+    bool ok = false;
+    const int playerId = QInputDialog::getInt(
+        this, "Снятие с тренировки", "ID участника:", 1, 1, 99999, 1, &ok);
+    if (!ok) {
+        return;
+    }
+
+    if (_club->withdrawPlayer(trainingId, playerId)) {
+        logAction(QString("снятие участника %1 с тренировки %2").arg(playerId).arg(trainingId));
+        refreshTrainings();
+        statusBar()->showMessage("Участник снят с тренировки.", 4000);
+    } else {
+        message("Не удалось снять участника.");
+    }
+}
+
+void MainWindow::showTrainingDetails()
+{
+    const int trainingId = selectedId(_trainingsTab);
+    if (trainingId < 0) {
+        message("Выберите тренировку в таблице.");
+        return;
+    }
+
+    std::shared_ptr<TrainingSession> training;
+    for (const auto &event : _club->getEvents()) {
+        auto candidate = std::dynamic_pointer_cast<TrainingSession>(event);
+        if (candidate && candidate->getId() == trainingId) {
+            training = candidate;
+            break;
+        }
+    }
+
+    if (!training) {
+        message("Тренировка не найдена.");
+        return;
+    }
+
+    const QString coachName = training->getCoach()
+        ? QString::fromStdString(training->getCoach()->getFullName())
+        : QString("не назначен");
+
+    QString text = QString("Тренировка: %1 (ID %2)\n"
+                           "Тема: %3\n"
+                           "Тренер: %4\n"
+                           "Длительность: %5 мин\n"
+                           "Участники (%6):\n")
+                       .arg(QString::fromStdString(std::string(training->getTitle())))
+                       .arg(trainingId)
+                       .arg(QString::fromStdString(std::string(training->getTopic())))
+                       .arg(coachName)
+                       .arg(training->getDurationMinutes())
+                       .arg(training->getParticipants().size());
+
+    if (training->getParticipants().empty()) {
+        text += "Пока никто не записан.";
+    } else {
+        for (const auto &member : training->getParticipants()) {
+            if (member) {
+                text += QString("· ID %1: %2\n")
+                            .arg(member->getId())
+                            .arg(QString::fromStdString(member->getFullName()));
+            }
+        }
+    }
+
+    QMessageBox::information(this, "Детали тренировки", text);
+}
+
 void MainWindow::addMatch()
 {
     CreateMatchDialog dialog(this);
+    for (auto *dateEdit : dialog.findChildren<QDateEdit *>()) {
+        dateEdit->setCalendarPopup(true);
+        if (auto *cal = dateEdit->calendarWidget()) {
+            cal->setMaximumSize(320, 240);
+            cal->setGridVisible(true);
+        }
+    }
+
     if (dialog.exec() != QDialog::Accepted) {
         return;
     }

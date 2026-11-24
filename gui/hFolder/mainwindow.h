@@ -5,7 +5,7 @@
 #include <QStringList>
 #include <memory>
 
-class QCheckBox;
+class QComboBox;
 class QLineEdit;
 class QSortFilterProxyModel;
 class QTabWidget;
@@ -41,6 +41,12 @@ private slots:
     void withdrawPlayer();
     void showStandings();
 
+    void addTraining();
+    void deleteTraining();
+    void enrollTrainingPlayer();
+    void withdrawTrainingPlayer();
+    void showTrainingDetails();
+
     void addMatch();
     void playMatch();
     void setMatchResult();
@@ -58,21 +64,21 @@ private:
         QSortFilterProxyModel *proxy = nullptr;
         QTableView *view = nullptr;
         QLineEdit *filter = nullptr;
-        QCheckBox *showArchive = nullptr;
+        QComboBox *statusFilter = nullptr;
     };
 
     void buildUi();
-    QWidget *buildTableTab(Tab &tab, const QStringList &headers);
+    QWidget *buildTableTab(Tab &tab, const QStringList &headers, bool withMatchStatusFilter = false);
     void openTextFileDialog(const QString &title, const QString &path);
 
     void refreshAll();
     void refreshPlayers();
     void refreshCoaches();
     void refreshTournaments();
+    void refreshTrainings();
     void refreshMatches();
 
     int selectedId(const Tab &tab) const;
-    void setArchivedForSelected(const Tab &tab, bool archived);
     void logAction(const QString &action);
     void message(const QString &text);
 
@@ -81,5 +87,6 @@ private:
     Tab _playersTab;
     Tab _coachesTab;
     Tab _tournamentsTab;
+    Tab _trainingsTab;
     Tab _matchesTab;
 };
