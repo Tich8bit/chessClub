@@ -5,6 +5,7 @@
 #include <QCheckBox>
 #include <QDialog>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -18,6 +19,7 @@
 #include <QStatusBar>
 #include <QTabWidget>
 #include <QTableView>
+#include <QTextEdit>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -52,8 +54,6 @@ constexpr auto STATE_FILE  = "club.txt";
 constexpr auto LOG_FILE    = "journal.log";
 constexpr auto REPORT_FILE = "report.txt";
 
-// exe запускается из build\gui, а club.txt лежит в корне проекта.
-// Ищем файл в текущем каталоге и двумя уровнями выше.
 QString stateDirectory()
 {
     const QStringList candidates = {"club.txt", "../club.txt", "../../club.txt"};
@@ -70,7 +70,6 @@ QString filePath(const char *name)
     return QDir(stateDirectory()).filePath(QString::fromUtf8(name));
 }
 
-// Тестовая система — для быстрой проверки интерфейса.
 void createTestClub(ChessClub &club)
 {
     auto p1 = std::make_shared<Player>(1, "Иван", "Иванов", "Иванович", Ratings(1200, 1250, 1300), 0, 0, 0);
@@ -98,11 +97,11 @@ void createTestClub(ChessClub &club)
 
 } // namespace
 
-MainWindow::MainWindow(QWidget *parent)
+MainWindow::MainWindow(const QString &clubName, QWidget *parent)
     : QMainWindow(parent)
-    , _club(std::make_unique<ChessClub>("Гамбит"))
+    , _club(std::make_unique<ChessClub>(clubName.toStdString()))
 {
-    setWindowTitle("chessClub");
+    setWindowTitle(clubName.isEmpty() ? QStringLiteral("chessClub") : clubName);
     resize(1100, 680);
 
     buildUi();
@@ -115,6 +114,11 @@ MainWindow::MainWindow(QWidget *parent)
     statusBar()->showMessage(QString("Клуб: %1 · участников: %2")
                                  .arg(QString::fromStdString(std::string(_club->getName())))
                                  .arg(_club->getPlayerCount()));
+}
+
+MainWindow::MainWindow(QWidget *parent)
+    : MainWindow(QStringLiteral("Гамбит"), parent)
+{
 }
 
 MainWindow::~MainWindow() = default;
@@ -137,7 +141,6 @@ int MainWindow::startupChoice()
     if (box.clickedButton() == loadButton) return 1;
     if (box.clickedButton() == newButton) return 0;
 
-    // Окно закрыли крестиком — приложение должно выйти.
     return -1;
 }
 
@@ -145,7 +148,7 @@ void MainWindow::applyStartup(int mode)
 {
     if (mode == 1) {
         try {
-            auto loaded = std::make_unique<ChessClub>("Гамбит");
+            auto loaded = std::make_unique<ChessClub>(std::string(_club->getName()));
             StorageManager::loadState(filePath(STATE_FILE).toStdString(), *loaded);
             _club = std::move(loaded);
         } catch (const ChessException &e) {
@@ -161,11 +164,14 @@ void MainWindow::applyStartup(int mode)
 void MainWindow::buildUi()
 {
     auto *fileMenu = menuBar()->addMenu("Файл");
-    fileMenu->addAction("Загрузить", this, &MainWindow::loadState);
     fileMenu->addAction("Сохранить", this, &MainWindow::saveState);
     fileMenu->addAction("Отчёт", this, &MainWindow::makeReport);
     fileMenu->addSeparator();
     fileMenu->addAction("Выход", this, &QWidget::close);
+
+    auto *adminMenu = menuBar()->addMenu("Админ");
+    adminMenu->addAction("Открыть отчёт", this, &MainWindow::viewReport);
+    adminMenu->addAction("Открыть журнал (логи)", this, &MainWindow::viewLog);
 
     auto *viewMenu = menuBar()->addMenu("Вид");
     auto *themeMenu = viewMenu->addMenu("Тема");
@@ -180,7 +186,6 @@ void MainWindow::buildUi()
     _tabs = new QTabWidget(this);
     setCentralWidget(_tabs);
 
-    // ----- Игроки -----
     {
         auto *page = buildTableTab(_playersTab,
             {"ID", "ФИО", "Классика", "Рапид", "Блиц", "В", "Н", "П", "Очки"});
@@ -212,7 +217,6 @@ void MainWindow::buildUi()
         _tabs->addTab(page, "Игроки");
     }
 
-    // ----- Тренеры -----
     {
         auto *page = buildTableTab(_coachesTab,
             {"ID", "ФИО", "Классика", "Рапид", "Блиц", "Стаж", "Специализация", "Квалификация"});
@@ -241,7 +245,6 @@ void MainWindow::buildUi()
         _tabs->addTab(page, "Тренеры");
     }
 
-    // ----- Турниры -----
     {
         auto *page = buildTableTab(_tournamentsTab,
             {"ID", "Название", "Контроль", "Система", "Участники", "Лимит", "Партии"});
@@ -269,7 +272,6 @@ void MainWindow::buildUi()
         _tabs->addTab(page, "Турниры");
     }
 
-    // ----- Матчи -----
     {
         auto *page = buildTableTab(_matchesTab,
             {"ID", "Белые", "Чёрные", "Дата", "Результат", "Турнир"});
@@ -334,11 +336,60 @@ QWidget *MainWindow::buildTableTab(Tab &tab, const QStringList &headers)
         tabPtr->proxy->setFilterFixedString(text);
     });
 
-    // Двойной клик по заголовку — подогнать ширину колонки под содержимое.
     connect(tab.view->horizontalHeader(), &QHeaderView::sectionDoubleClicked, this,
             [tabPtr](int column) { tabPtr->view->resizeColumnToContents(column); });
 
     return page;
+}
+
+void MainWindow::openTextFileDialog(const QString &title, const QString &path)
+{
+    QFile file(path);
+    if (!file.exists()) {
+        message(QString("Файл не найден:\n%1").arg(QDir::toNativeSeparators(path)));
+        return;
+    }
+
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, "Ошибка чтения",
+                             QString("Не удалось открыть файл:\n%1").arg(QDir::toNativeSeparators(path)));
+        return;
+    }
+
+    auto *dialog = new QDialog(this);
+    dialog->setWindowTitle(title);
+    dialog->resize(760, 520);
+
+    auto *layout = new QVBoxLayout(dialog);
+    auto *viewer = new QTextEdit(dialog);
+    viewer->setReadOnly(true);
+    viewer->setLineWrapMode(QTextEdit::NoWrap);
+    viewer->setPlainText(QString::fromUtf8(file.readAll()));
+    file.close();
+
+    auto *buttons = new QHBoxLayout;
+    auto *refreshBtn = new QPushButton("Обновить", dialog);
+    auto *closeBtn = new QPushButton("Закрыть", dialog);
+    buttons->addWidget(refreshBtn);
+    buttons->addStretch();
+    buttons->addWidget(closeBtn);
+
+    layout->addWidget(viewer, 1);
+    layout->addLayout(buttons);
+
+    connect(refreshBtn, &QPushButton::clicked, dialog, [dialog, viewer, path]() {
+        QFile f(path);
+        if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            viewer->setPlainText(QString::fromUtf8(f.readAll()));
+            f.close();
+        } else {
+            QMessageBox::warning(dialog, "Ошибка чтения", "Не удалось перечитать файл.");
+        }
+    });
+    connect(closeBtn, &QPushButton::clicked, dialog, &QDialog::accept);
+
+    dialog->exec();
+    dialog->deleteLater();
 }
 
 void MainWindow::refreshAll()
@@ -526,7 +577,6 @@ void MainWindow::logAction(const QString &action)
     try {
         StorageManager::logAction(filePath(LOG_FILE).toStdString(), action.toStdString());
     } catch (const ChessException &) {
-        // журнал не должен ломать операцию
     }
 }
 
@@ -534,8 +584,6 @@ void MainWindow::message(const QString &text)
 {
     QMessageBox::information(this, "chessClub", text);
 }
-
-// ---------------------------------------------------------------- игроки
 
 void MainWindow::addPlayer()
 {
@@ -672,8 +720,6 @@ void MainWindow::deletePlayer()
     }
 }
 
-// ---------------------------------------------------------------- тренеры
-
 void MainWindow::addCoach()
 {
     AddCoachDialog dialog(this);
@@ -720,8 +766,6 @@ void MainWindow::deleteCoach()
         message("Тренер не найден.");
     }
 }
-
-// ---------------------------------------------------------------- турниры
 
 void MainWindow::addTournament()
 {
@@ -859,8 +903,6 @@ void MainWindow::showStandings()
     QMessageBox::information(this, "Турнирная таблица", text);
 }
 
-// ---------------------------------------------------------------- матчи
-
 void MainWindow::addMatch()
 {
     CreateMatchDialog dialog(this);
@@ -964,8 +1006,6 @@ void MainWindow::deleteMatch()
     }
 }
 
-// ---------------------------------------------------------------- файлы
-
 void MainWindow::saveState()
 {
     try {
@@ -977,27 +1017,27 @@ void MainWindow::saveState()
     }
 }
 
-void MainWindow::loadState()
-{
-    try {
-        auto loaded = std::make_unique<ChessClub>("Гамбит");
-        StorageManager::loadState(filePath(STATE_FILE).toStdString(), *loaded);
-        _club = std::move(loaded);
-        refreshAll();
-        statusBar()->showMessage("Загружено из club.txt", 4000);
-    } catch (const ChessException &e) {
-        QMessageBox::warning(this, "Ошибка загрузки", e.what());
-    }
-}
-
 void MainWindow::makeReport()
 {
     try {
-        StorageManager::generateReport(filePath(REPORT_FILE).toStdString(), *_club);
+        const QString path = filePath(REPORT_FILE);
+        StorageManager::generateReport(path.toStdString(), *_club);
+        logAction("сформирован отчёт report.txt");
         statusBar()->showMessage("Отчёт записан в report.txt", 4000);
+        openTextFileDialog("Отчёт клуба (report.txt)", path);
     } catch (const ChessException &e) {
         QMessageBox::warning(this, "Ошибка отчёта", e.what());
     }
+}
+
+void MainWindow::viewReport()
+{
+    openTextFileDialog("Отчёт клуба (report.txt)", filePath(REPORT_FILE));
+}
+
+void MainWindow::viewLog()
+{
+    openTextFileDialog("Журнал действий (journal.log)", filePath(LOG_FILE));
 }
 
 void MainWindow::applyTheme(const QString &name)
