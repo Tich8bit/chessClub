@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QSet>
 #include <QString>
 #include <QStringList>
 #include <memory>
@@ -36,15 +37,19 @@ private slots:
     void deleteCoach();
 
     void addTournament();
+    void finishTournament();
     void deleteTournament();
     void enrollPlayer();
     void withdrawPlayer();
     void showStandings();
+    void showTournamentInfo();
 
     void addTraining();
     void deleteTraining();
     void enrollTrainingPlayer();
     void withdrawTrainingPlayer();
+    void finishTraining();
+    void cancelTraining();
     void showTrainingDetails();
 
     void addMatch();
@@ -56,7 +61,6 @@ private slots:
     void makeReport();
     void viewReport();
     void viewLog();
-    void applyTheme(const QString &name);
 
 private:
     struct Tab {
@@ -68,8 +72,19 @@ private:
     };
 
     void buildUi();
+    void applyBlueTheme();
     QWidget *buildTableTab(Tab &tab, const QStringList &headers, bool withMatchStatusFilter = false);
     void openTextFileDialog(const QString &title, const QString &path);
+
+    void populateTournamentParticipantsFromMatches();
+    void autoPersist();
+
+    bool isTournamentFinished(int tournamentId) const;
+    QString tournamentStatusLabel(int tournamentId) const;
+
+    QString trainingStatusLabel(int trainingId) const;
+    bool isTrainingCompleted(int trainingId) const;
+    bool isTrainingCancelled(int trainingId) const;
 
     void refreshAll();
     void refreshPlayers();
@@ -89,4 +104,8 @@ private:
     Tab _tournamentsTab;
     Tab _trainingsTab;
     Tab _matchesTab;
+
+    QSet<int> _finishedTournaments;
+    QSet<int> _completedTrainings;
+    QSet<int> _cancelledTrainings;
 };
