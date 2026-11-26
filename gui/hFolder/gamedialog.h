@@ -8,6 +8,7 @@
 class ChessClub;
 class ChessBoardWidget;
 class ChessGame;
+class QAction;
 class QLabel;
 class QListWidget;
 class QPushButton;
@@ -38,6 +39,7 @@ private slots:
 
 private:
     void rebuildView();
+    void syncBoardOrientation();
     void refresh();
     void clearSelection();
     QString askPromotion() const;
@@ -47,10 +49,14 @@ private:
     int _matchId = -1;
     bool _editable = false;
     bool _flipped = false;
+    bool _autoFlip = true;
     int _ply = 0;
 
     std::shared_ptr<ChessGame> _game;      // настоящая партия
     std::shared_ptr<ChessGame> _viewGame;  // позиция для показа
+
+    QAction *_whiteAction = nullptr;
+    QAction *_blackAction = nullptr;
 
     ChessBoardWidget *_board = nullptr;
     QListWidget *_moveList = nullptr;

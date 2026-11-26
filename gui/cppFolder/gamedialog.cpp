@@ -57,33 +57,45 @@ GameDialog::GameDialog(ChessClub *club, int matchId, QWidget *parent)
     _ply = _game ? static_cast<int>(_game->history().size()) : 0;
 
     setWindowTitle(QString("Партия #%1").arg(matchId));
-    resize(1080, 760);
+    resize(1120, 780);
 
-    // Оформление в духе chess.com: тёмная панель и зелёные кнопки.
+    // Палитра по референсу: пыльно-лавандовые акценты и мягкий серо-сиреневый графит.
     setStyleSheet(R"(
-QDialog { background-color: #312e2b; }
+QDialog { background-color: #2e303a; }
 QPushButton {
-    background-color: #81b64c;
-    color: #ffffff;
+    background-color: #9f7e9e;
+    color: #f7f6fb;
     font-weight: 600;
-    border: none;
-    border-radius: 6px;
-    padding: 10px 14px;
+    font-size: 13px;
+    border: 1px solid #b594b4;
+    border-radius: 12px;
+    padding: 10px 18px;
+    min-height: 20px;
 }
-QPushButton:hover { background-color: #9bd05d; }
-QPushButton:pressed { background-color: #6fa23f; }
-QPushButton:disabled { background-color: #3f4650; color: #9aa0a6; }
+QPushButton:hover {
+    background-color: #b895b7;
+    border-color: #d2b2d1;
+}
+QPushButton:pressed {
+    background-color: #846583;
+}
+QPushButton:disabled {
+    background-color: #3d404e;
+    border-color: #4b4e60;
+    color: #9194a6;
+}
 QListWidget {
-    background-color: #262421;
-    color: #e8e8e8;
-    border: 1px solid #3a3835;
-    border-radius: 6px;
+    background-color: #383b48;
+    color: #f2f1f7;
+    border: 1px solid #525669;
+    border-radius: 10px;
+    padding: 6px;
 }
-QLabel { color: #e8e8e8; }
-QMenuBar { background-color: #262421; color: #e8e8e8; }
-QMenuBar::item:selected { background-color: #81b64c; }
-QMenu { background-color: #262421; color: #e8e8e8; }
-QMenu::item:selected { background-color: #81b64c; }
+QLabel { color: #f2f1f7; }
+QMenuBar { background-color: #383b48; color: #f2f1f7; }
+QMenuBar::item:selected { background-color: #9f7e9e; color: #ffffff; }
+QMenu { background-color: #383b48; color: #f2f1f7; border: 1px solid #525669; }
+QMenu::item:selected { background-color: #9f7e9e; color: #ffffff; }
 )");
 
     auto *menuBar = new QMenuBar(this);
@@ -91,21 +103,21 @@ QMenu::item:selected { background-color: #81b64c; }
     auto *group = new QActionGroup(this);
     group->setExclusive(true);
 
-    auto *whiteAction = viewMenu->addAction("Белые снизу");
-    whiteAction->setCheckable(true);
-    whiteAction->setChecked(true);
-    group->addAction(whiteAction);
+    _whiteAction = viewMenu->addAction("Белые снизу");
+    _whiteAction->setCheckable(true);
+    _whiteAction->setChecked(true);
+    group->addAction(_whiteAction);
 
-    auto *blackAction = viewMenu->addAction("Чёрные снизу");
-    blackAction->setCheckable(true);
-    group->addAction(blackAction);
+    _blackAction = viewMenu->addAction("Чёрные снизу");
+    _blackAction->setCheckable(true);
+    group->addAction(_blackAction);
 
-    connect(whiteAction, &QAction::triggered, this, &GameDialog::orientWhiteBottom);
-    connect(blackAction, &QAction::triggered, this, &GameDialog::orientBlackBottom);
+    connect(_whiteAction, &QAction::triggered, this, &GameDialog::orientWhiteBottom);
+    connect(_blackAction, &QAction::triggered, this, &GameDialog::orientBlackBottom);
 
     _board = new ChessBoardWidget(this);
     _moveList = new QListWidget(this);
-    _moveList->setMinimumWidth(240);
+    _moveList->setMinimumWidth(250);
 
     _status = new QLabel(this);
     _status->setWordWrap(true);
@@ -121,12 +133,14 @@ QMenu::item:selected { background-color: #81b64c; }
     _endButton = new QPushButton(">|", this);
 
     auto *navLayout = new QHBoxLayout;
+    navLayout->setSpacing(8);
     navLayout->addWidget(_startButton);
     navLayout->addWidget(_prevButton);
     navLayout->addWidget(_nextButton);
     navLayout->addWidget(_endButton);
 
     auto *right = new QVBoxLayout;
+    right->setSpacing(10);
     right->addWidget(new QLabel("Ходы:", this));
     right->addWidget(_moveList, 1);
     right->addLayout(navLayout);
@@ -137,6 +151,7 @@ QMenu::item:selected { background-color: #81b64c; }
     right->addWidget(closeButton);
 
     auto *content = new QHBoxLayout;
+    content->setSpacing(16);
     content->addWidget(_board, 3);
     content->addLayout(right, 1);
 
@@ -148,7 +163,7 @@ QMenu::item:selected { background-color: #81b64c; }
     connect(_undoButton, &QPushButton::clicked, this, &GameDialog::undoMove);
     connect(_resignButton, &QPushButton::clicked, this, &GameDialog::resign);
     connect(_drawButton, &QPushButton::clicked, this, &GameDialog::drawAgree);
-    connect(closeButton, &QPushButton::clicked, this, &QDialog::accept);
+    connect(closeButton, &QPushButton::clicked, this, &GameDialog::accept);
 
     connect(_startButton, &QPushButton::clicked, this, &GameDialog::toStart);
     connect(_prevButton, &QPushButton::clicked, this, &GameDialog::stepBack);
@@ -178,6 +193,22 @@ void GameDialog::rebuildView()
     _board->setGame(_viewGame.get());
 }
 
+void GameDialog::syncBoardOrientation()
+{
+    if (_autoFlip && _editable && _game && !_game->isOver()) {
+        _flipped = !_game->whiteToMove();
+    }
+
+    if (_whiteAction && _blackAction) {
+        QSignalBlocker b1(_whiteAction);
+        QSignalBlocker b2(_blackAction);
+        _whiteAction->setChecked(!_flipped);
+        _blackAction->setChecked(_flipped);
+    }
+
+    _board->setFlipped(_flipped);
+}
+
 void GameDialog::refresh()
 {
     if (!_game) {
@@ -192,8 +223,8 @@ void GameDialog::refresh()
     _ply = std::max(0, std::min(_ply, static_cast<int>(history.size())));
 
     rebuildView();
+    syncBoardOrientation();
 
-    _board->setFlipped(_flipped);
     _board->setSelectedSquare(_selected);
     _board->setLegalTargets(_targets);
 
@@ -425,12 +456,14 @@ void GameDialog::onMoveActivated(int row)
 
 void GameDialog::orientWhiteBottom()
 {
+    _autoFlip = false;
     _flipped = false;
-    _board->setFlipped(false);
+    syncBoardOrientation();
 }
 
 void GameDialog::orientBlackBottom()
 {
+    _autoFlip = false;
     _flipped = true;
-    _board->setFlipped(true);
+    syncBoardOrientation();
 }
