@@ -11,6 +11,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSignalBlocker>
+#include <QTimer>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -44,19 +45,57 @@ int squareIndex(const QString &name)
     return rank * 8 + file;
 }
 
+QString controlLabel(Tournament::TimeControl control)
+{
+    switch (control) {
+    case Tournament::TimeControl::Blitz:   return "Блиц";
+    case Tournament::TimeControl::Rapid:   return "Рапид";
+    case Tournament::TimeControl::Classic: return "Классика";
+    }
+    return "Рапид";
+}
+
 } // namespace
 
-GameDialog::GameDialog(ChessClub *club, int matchId, QWidget *parent)
+int GameDialog::initialSecondsForControl(Tournament::TimeControl control)
+{
+    switch (control) {
+    case Tournament::TimeControl::Blitz:   return 3 * 60;
+    case Tournament::TimeControl::Rapid:   return 10 * 60;
+    case Tournament::TimeControl::Classic: return 30 * 60;
+    }
+    return 10 * 60;
+}
+
+QString GameDialog::formatSeconds(int seconds)
+{
+    const int clamped = std::max(0, seconds);
+    const int mins = clamped / 60;
+    const int secs = clamped % 60;
+    return QString("%1:%2")
+        .arg(mins, 2, 10, QChar('0'))
+        .arg(secs, 2, 10, QChar('0'));
+}
+
+GameDialog::GameDialog(ChessClub *club,
+                       int matchId,
+                       Tournament::TimeControl timeControl,
+                       QWidget *parent)
     : QDialog(parent)
     , _club(club)
     , _matchId(matchId)
+    , _timeControl(timeControl)
 {
-    auto match = _club->findMatchById(_matchId);
+    auto match = _club ? _club->findMatchById(_matchId) : nullptr;
     _game = match ? match->game() : nullptr;
     _editable = match && _game && !match->getResult().isPlayed();
     _ply = _game ? static_cast<int>(_game->history().size()) : 0;
 
-    setWindowTitle(QString("Партия #%1").arg(matchId));
+    const int initSec = initialSecondsForControl(_timeControl);
+    _whiteSecondsLeft = initSec;
+    _blackSecondsLeft = initSec;
+
+    setWindowTitle(QString("Партия #%1 · %2").arg(matchId).arg(controlLabel(_timeControl)));
     resize(1120, 780);
 
     // Палитра по референсу: пыльно-лавандовые акценты и мягкий серо-сиреневый графит.
@@ -119,6 +158,14 @@ QMenu::item:selected { background-color: #9f7e9e; color: #ffffff; }
     _moveList = new QListWidget(this);
     _moveList->setMinimumWidth(250);
 
+    _whiteClockLabel = new QLabel(this);
+    _blackClockLabel = new QLabel(this);
+
+    auto *clocksRow = new QHBoxLayout;
+    clocksRow->setSpacing(10);
+    clocksRow->addWidget(_whiteClockLabel, 1);
+    clocksRow->addWidget(_blackClockLabel, 1);
+
     _status = new QLabel(this);
     _status->setWordWrap(true);
 
@@ -141,6 +188,8 @@ QMenu::item:selected { background-color: #9f7e9e; color: #ffffff; }
 
     auto *right = new QVBoxLayout;
     right->setSpacing(10);
+    right->addWidget(new QLabel(QString("Контроль: %1").arg(controlLabel(_timeControl)), this));
+    right->addLayout(clocksRow);
     right->addWidget(new QLabel("Ходы:", this));
     right->addWidget(_moveList, 1);
     right->addLayout(navLayout);
@@ -159,6 +208,10 @@ QMenu::item:selected { background-color: #9f7e9e; color: #ffffff; }
     root->setMenuBar(menuBar);
     root->addLayout(content);
 
+    _clockTimer = new QTimer(this);
+    _clockTimer->setInterval(1000);
+    connect(_clockTimer, &QTimer::timeout, this, &GameDialog::onClockTick);
+
     connect(_board, &ChessBoardWidget::squareClicked, this, &GameDialog::onSquareClicked);
     connect(_undoButton, &QPushButton::clicked, this, &GameDialog::undoMove);
     connect(_resignButton, &QPushButton::clicked, this, &GameDialog::resign);
@@ -172,6 +225,86 @@ QMenu::item:selected { background-color: #9f7e9e; color: #ffffff; }
     connect(_moveList, &QListWidget::currentRowChanged, this, &GameDialog::onMoveActivated);
 
     refresh();
+    syncClockTimer();
+}
+
+GameDialog::~GameDialog()
+{
+    if (_clockTimer) {
+        _clockTimer->stop();
+    }
+}
+
+void GameDialog::updateClocks()
+{
+    if (!_whiteClockLabel || !_blackClockLabel) {
+        return;
+    }
+
+    const bool activeWhite = _editable && !_flagged && _game && !_game->isOver() && _game->whiteToMove();
+    const bool activeBlack = _editable && !_flagged && _game && !_game->isOver() && !_game->whiteToMove();
+
+    _whiteClockLabel->setText(QString("Белые: %1").arg(formatSeconds(_whiteSecondsLeft)));
+    _blackClockLabel->setText(QString("Чёрные: %1").arg(formatSeconds(_blackSecondsLeft)));
+
+    const QString activeStyle =
+        "background-color: #464259; border: 2px solid #d2b2d1; border-radius: 10px; "
+        "padding: 8px 10px; font-weight: 700; font-size: 14px; color: #ffffff;";
+    const QString idleStyle =
+        "background-color: #383b48; border: 1px solid #525669; border-radius: 10px; "
+        "padding: 8px 10px; font-weight: 600; font-size: 14px; color: #d6d4e2;";
+
+    _whiteClockLabel->setStyleSheet(activeWhite ? activeStyle : idleStyle);
+    _blackClockLabel->setStyleSheet(activeBlack ? activeStyle : idleStyle);
+}
+
+void GameDialog::syncClockTimer()
+{
+    if (!_clockTimer) {
+        return;
+    }
+    const bool shouldRun = _editable && !_flagged && _game && !_game->isOver();
+    if (shouldRun && !_clockTimer->isActive()) {
+        _clockTimer->start();
+    } else if (!shouldRun && _clockTimer->isActive()) {
+        _clockTimer->stop();
+    }
+}
+
+void GameDialog::onClockTick()
+{
+    if (!_editable || _flagged || !_game || _game->isOver()) {
+        syncClockTimer();
+        return;
+    }
+
+    if (_game->whiteToMove()) {
+        _whiteSecondsLeft = std::max(0, _whiteSecondsLeft - 1);
+    } else {
+        _blackSecondsLeft = std::max(0, _blackSecondsLeft - 1);
+    }
+
+    updateClocks();
+
+    if (_whiteSecondsLeft <= 0 || _blackSecondsLeft <= 0) {
+        _flagged = true;
+        syncClockTimer();
+
+        const bool whiteTimedOut = (_whiteSecondsLeft <= 0);
+        if (_club) {
+            _club->resignMatch(_matchId, whiteTimedOut);
+        }
+        _editable = false;
+        clearSelection();
+        refresh();
+
+        QMessageBox::information(
+            this,
+            "Время вышло",
+            whiteTimedOut
+                ? "У белых закончилось время. Победа чёрных по времени."
+                : "У чёрных закончилось время. Победа белых по времени.");
+    }
 }
 
 void GameDialog::rebuildView()
@@ -213,6 +346,8 @@ void GameDialog::refresh()
 {
     if (!_game) {
         _status->setText("У этой партии нет истории ходов.");
+        updateClocks();
+        syncClockTimer();
         return;
     }
 
@@ -252,7 +387,7 @@ void GameDialog::refresh()
     }
 
     if (!_editable) {
-        const auto match = _club->findMatchById(_matchId);
+        const auto match = _club ? _club->findMatchById(_matchId) : nullptr;
         QString result;
         if (match && match->getResult().isPlayed()) {
             result = QString(" · результат: %1").arg(QString::fromStdString(match->getResult().toString()));
@@ -272,6 +407,8 @@ void GameDialog::refresh()
     _resignButton->setEnabled(_editable && !_game->isOver());
     _drawButton->setEnabled(_editable && !_game->isOver());
 
+    updateClocks();
+    syncClockTimer();
     updateNavigation();
 }
 
@@ -302,10 +439,20 @@ void GameDialog::clearSelection()
 
 QString GameDialog::askPromotion() const
 {
+    const bool wasRunning = _clockTimer && _clockTimer->isActive();
+    if (wasRunning) {
+        _clockTimer->stop();
+    }
+
     const QStringList options{"Ферзь", "Ладья", "Слон", "Конь"};
     bool ok = false;
     const QString choice = QInputDialog::getItem(const_cast<GameDialog *>(this), "Превращение",
                                                  "Выберите фигуру:", options, 0, false, &ok);
+
+    if (wasRunning && _clockTimer) {
+        _clockTimer->start();
+    }
+
     if (!ok) {
         return QString();
     }
@@ -347,7 +494,9 @@ void GameDialog::onSquareClicked(int square)
             }
 
             try {
-                _club->playMove(_matchId, uci.toStdString());
+                if (_club) {
+                    _club->playMove(_matchId, uci.toStdString());
+                }
             } catch (const ChessException &e) {
                 QMessageBox::warning(this, "Ход", e.what());
             }
@@ -381,7 +530,7 @@ void GameDialog::onSquareClicked(int square)
 
 void GameDialog::undoMove()
 {
-    if (_club->undoMove(_matchId)) {
+    if (_club && _club->undoMove(_matchId)) {
         clearSelection();
         refresh();
     }
@@ -389,27 +538,47 @@ void GameDialog::undoMove()
 
 void GameDialog::resign()
 {
+    const bool wasRunning = _clockTimer && _clockTimer->isActive();
+    if (wasRunning) {
+        _clockTimer->stop();
+    }
+
     const bool whiteResigns = _game->whiteToMove();
     const QString who = whiteResigns ? "белые" : "чёрные";
 
     if (QMessageBox::question(this, "Сдача",
                               QString("Сдать партию (%1)?\nЭто зачтётся как поражение.").arg(who))
         != QMessageBox::Yes) {
+        if (wasRunning && _clockTimer) {
+            _clockTimer->start();
+        }
         return;
     }
 
-    _club->resignMatch(_matchId, whiteResigns);
+    if (_club) {
+        _club->resignMatch(_matchId, whiteResigns);
+    }
     clearSelection();
     refresh();
 }
 
 void GameDialog::drawAgree()
 {
+    const bool wasRunning = _clockTimer && _clockTimer->isActive();
+    if (wasRunning) {
+        _clockTimer->stop();
+    }
+
     if (QMessageBox::question(this, "Ничья", "Зафиксировать ничью по согласию?") != QMessageBox::Yes) {
+        if (wasRunning && _clockTimer) {
+            _clockTimer->start();
+        }
         return;
     }
 
-    _club->agreeDraw(_matchId);
+    if (_club) {
+        _club->agreeDraw(_matchId);
+    }
     clearSelection();
     refresh();
 }
