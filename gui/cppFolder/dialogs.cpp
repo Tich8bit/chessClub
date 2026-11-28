@@ -10,11 +10,28 @@
 #include <QTimeEdit>
 #include <QVBoxLayout>
 
+#include <memory>
+#include <utility>
+
 namespace {
+
+template <typename T, typename Parent, typename... Args>
+T *makeOwned(Parent *parent, Args &&...args)
+{
+    auto ptr = std::make_unique<T>(std::forward<Args>(args)..., parent);
+    return ptr.release();
+}
+
+template <typename T, typename... Args>
+T *makeLayout(Args &&...args)
+{
+    auto ptr = std::make_unique<T>(std::forward<Args>(args)...);
+    return ptr.release();
+}
 
 QDialogButtonBox *makeButtons(QDialog *dialog)
 {
-    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, dialog);
+    auto *buttons = makeOwned<QDialogButtonBox>(dialog, QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
     QObject::connect(buttons, &QDialogButtonBox::accepted, dialog, &QDialog::accept);
     QObject::connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
     return buttons;
@@ -22,7 +39,7 @@ QDialogButtonBox *makeButtons(QDialog *dialog)
 
 QSpinBox *makeRatingSpin(QWidget *parent, int value)
 {
-    auto *spin = new QSpinBox(parent);
+    auto *spin = makeOwned<QSpinBox>(parent);
     spin->setRange(0, 3000);
     spin->setValue(value);
     return spin;
@@ -35,10 +52,10 @@ AddPlayerDialog::AddPlayerDialog(QWidget *parent)
 {
     setWindowTitle("Новый игрок");
 
-    auto *form = new QFormLayout;
-    m_lastName = new QLineEdit(this);
-    m_firstName = new QLineEdit(this);
-    m_middleName = new QLineEdit(this);
+    auto *form = makeLayout<QFormLayout>();
+    m_lastName = makeOwned<QLineEdit>(this);
+    m_firstName = makeOwned<QLineEdit>(this);
+    m_middleName = makeOwned<QLineEdit>(this);
     m_classical = makeRatingSpin(this, 1000);
     m_rapid = makeRatingSpin(this, 1000);
     m_blitz = makeRatingSpin(this, 1000);
@@ -50,7 +67,7 @@ AddPlayerDialog::AddPlayerDialog(QWidget *parent)
     form->addRow("Рейтинг (рапид):", m_rapid);
     form->addRow("Рейтинг (блиц):", m_blitz);
 
-    auto *layout = new QVBoxLayout(this);
+    auto *layout = makeOwned<QVBoxLayout>(this);
     layout->addLayout(form);
     layout->addWidget(makeButtons(this));
 }
@@ -77,19 +94,19 @@ AddCoachDialog::AddCoachDialog(QWidget *parent)
 {
     setWindowTitle("Новый тренер");
 
-    auto *form = new QFormLayout;
-    m_lastName = new QLineEdit(this);
-    m_firstName = new QLineEdit(this);
-    m_middleName = new QLineEdit(this);
+    auto *form = makeLayout<QFormLayout>();
+    m_lastName = makeOwned<QLineEdit>(this);
+    m_firstName = makeOwned<QLineEdit>(this);
+    m_middleName = makeOwned<QLineEdit>(this);
     m_classical = makeRatingSpin(this, 1000);
     m_rapid = makeRatingSpin(this, 1000);
     m_blitz = makeRatingSpin(this, 1000);
-    m_experience = new QSpinBox(this);
+    m_experience = makeOwned<QSpinBox>(this);
     m_experience->setRange(0, 80);
-    m_qualification = new QSpinBox(this);
+    m_qualification = makeOwned<QSpinBox>(this);
     m_qualification->setRange(1, 5);
 
-    m_specialization = new QComboBox(this);
+    m_specialization = makeOwned<QComboBox>(this);
     m_specialization->addItems({"Дебюты", "Миттельшпиль", "Эндшпиль", "Тактика", "Общая"});
 
     form->addRow("Фамилия:", m_lastName);
@@ -102,7 +119,7 @@ AddCoachDialog::AddCoachDialog(QWidget *parent)
     form->addRow("Специализация:", m_specialization);
     form->addRow("Квалификация:", m_qualification);
 
-    auto *layout = new QVBoxLayout(this);
+    auto *layout = makeOwned<QVBoxLayout>(this);
     layout->addLayout(form);
     layout->addWidget(makeButtons(this));
 }
@@ -132,17 +149,17 @@ AddTournamentDialog::AddTournamentDialog(QWidget *parent)
 {
     setWindowTitle("Новый турнир");
 
-    auto *form = new QFormLayout;
-    m_title = new QLineEdit(this);
+    auto *form = makeLayout<QFormLayout>();
+    m_title = makeOwned<QLineEdit>(this);
 
-    m_timeControl = new QComboBox(this);
+    m_timeControl = makeOwned<QComboBox>(this);
     m_timeControl->addItems({"Блиц", "Рапид", "Классика"});
     m_timeControl->setCurrentIndex(2);
 
-    m_system = new QComboBox(this);
+    m_system = makeOwned<QComboBox>(this);
     m_system->addItems({"Круговая", "Швейцарская", "Плей-офф"});
 
-    m_maxPlayers = new QSpinBox(this);
+    m_maxPlayers = makeOwned<QSpinBox>(this);
     m_maxPlayers->setRange(2, 200);
     m_maxPlayers->setValue(8);
 
@@ -151,7 +168,7 @@ AddTournamentDialog::AddTournamentDialog(QWidget *parent)
     form->addRow("Система:", m_system);
     form->addRow("Макс. игроков:", m_maxPlayers);
 
-    auto *layout = new QVBoxLayout(this);
+    auto *layout = makeOwned<QVBoxLayout>(this);
     layout->addLayout(form);
     layout->addWidget(makeButtons(this));
 }
@@ -176,20 +193,20 @@ CreateMatchDialog::CreateMatchDialog(QWidget *parent)
 {
     setWindowTitle("Новая партия");
 
-    auto *form = new QFormLayout;
-    m_tournamentId = new QSpinBox(this);
+    auto *form = makeLayout<QFormLayout>();
+    m_tournamentId = makeOwned<QSpinBox>(this);
     m_tournamentId->setRange(0, 99999);
     m_tournamentId->setSpecialValueText("вне турнира");
 
-    m_whiteId = new QSpinBox(this);
+    m_whiteId = makeOwned<QSpinBox>(this);
     m_whiteId->setRange(1, 99999);
-    m_blackId = new QSpinBox(this);
+    m_blackId = makeOwned<QSpinBox>(this);
     m_blackId->setRange(1, 99999);
     m_blackId->setValue(2);
 
-    m_date = new QDateEdit(QDate::currentDate(), this);
+    m_date = makeOwned<QDateEdit>(this, QDate::currentDate());
     m_date->setDisplayFormat("dd.MM.yyyy");
-    m_time = new QTimeEdit(QTime::currentTime(), this);
+    m_time = makeOwned<QTimeEdit>(this, QTime::currentTime());
     m_time->setDisplayFormat("HH:mm");
 
     form->addRow("ID турнира:", m_tournamentId);
@@ -198,9 +215,20 @@ CreateMatchDialog::CreateMatchDialog(QWidget *parent)
     form->addRow("Дата:", m_date);
     form->addRow("Время:", m_time);
 
-    auto *layout = new QVBoxLayout(this);
+    auto *layout = makeOwned<QVBoxLayout>(this);
     layout->addLayout(form);
     layout->addWidget(makeButtons(this));
+}
+
+void CreateMatchDialog::accept()
+{
+    tournamentId = m_tournamentId->value();
+    whiteId = m_whiteId->value();
+    blackId = m_blackId->value();
+    date = m_date->date();
+    time = m_time->time();
+
+    QDialog::accept();
 }
 
 ResultDialog::ResultDialog(QWidget *parent)
@@ -208,10 +236,10 @@ ResultDialog::ResultDialog(QWidget *parent)
 {
     setWindowTitle("Результат партии");
 
-    m_result = new QComboBox(this);
+    m_result = makeOwned<QComboBox>(this);
     m_result->addItems({"Ничья", "Победа белых", "Победа чёрных"});
 
-    auto *layout = new QVBoxLayout(this);
+    auto *layout = makeOwned<QVBoxLayout>(this);
     layout->addWidget(m_result);
     auto *buttons = makeButtons(this);
     QObject::connect(buttons, &QDialogButtonBox::accepted, this, [this]() {

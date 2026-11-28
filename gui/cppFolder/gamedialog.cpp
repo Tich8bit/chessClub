@@ -2,6 +2,7 @@
 
 #include <QAction>
 #include <QActionGroup>
+#include <QComboBox>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QLabel>
@@ -15,6 +16,7 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <utility>
 
 #include "chessClub.h"
 #include "chessboardwidget.h"
@@ -23,6 +25,20 @@
 #include "match.h"
 
 namespace {
+
+template <typename T, typename Parent, typename... Args>
+T *makeOwned(Parent *parent, Args &&...args)
+{
+    auto ptr = std::make_unique<T>(std::forward<Args>(args)..., parent);
+    return ptr.release();
+}
+
+template <typename T, typename... Args>
+T *makeLayout(Args &&...args)
+{
+    auto ptr = std::make_unique<T>(std::forward<Args>(args)...);
+    return ptr.release();
+}
 
 QString squareName(int square)
 {
@@ -96,9 +112,8 @@ GameDialog::GameDialog(ChessClub *club,
     _blackSecondsLeft = initSec;
 
     setWindowTitle(QString("Партия #%1 · %2").arg(matchId).arg(controlLabel(_timeControl)));
-    resize(1120, 780);
+    resize(1140, 790);
 
-    // Палитра по референсу: пыльно-лавандовые акценты и мягкий серо-сиреневый графит.
     setStyleSheet(R"(
 QDialog { background-color: #2e303a; }
 QPushButton {
@@ -123,6 +138,14 @@ QPushButton:disabled {
     border-color: #4b4e60;
     color: #9194a6;
 }
+QComboBox {
+    background-color: #383b48;
+    color: #f2f1f7;
+    border: 1px solid #585c70;
+    border-radius: 10px;
+    padding: 7px 11px;
+    min-height: 20px;
+}
 QListWidget {
     background-color: #383b48;
     color: #f2f1f7;
@@ -137,9 +160,9 @@ QMenu { background-color: #383b48; color: #f2f1f7; border: 1px solid #525669; }
 QMenu::item:selected { background-color: #9f7e9e; color: #ffffff; }
 )");
 
-    auto *menuBar = new QMenuBar(this);
+    auto *menuBar = makeOwned<QMenuBar>(this);
     auto *viewMenu = menuBar->addMenu("Вид");
-    auto *group = new QActionGroup(this);
+    auto *group = makeOwned<QActionGroup>(this);
     group->setExclusive(true);
 
     _whiteAction = viewMenu->addAction("Белые снизу");
@@ -151,66 +174,90 @@ QMenu::item:selected { background-color: #9f7e9e; color: #ffffff; }
     _blackAction->setCheckable(true);
     group->addAction(_blackAction);
 
-    connect(_whiteAction, &QAction::triggered, this, &GameDialog::orientWhiteBottom);
-    connect(_blackAction, &QAction::triggered, this, &GameDialog::orientBlackBottom);
+    _autoFlipAction = viewMenu->addAction("Переворачивать после хода");
+    _autoFlipAction->setCheckable(true);
+    group->addAction(_autoFlipAction);
 
-    _board = new ChessBoardWidget(this);
-    _moveList = new QListWidget(this);
-    _moveList->setMinimumWidth(250);
+    connect(_whiteAction, &QAction::triggered, this, &GameDialog::setWhiteBottomMode);
+    connect(_blackAction, &QAction::triggered, this, &GameDialog::setBlackBottomMode);
+    connect(_autoFlipAction, &QAction::triggered, this, &GameDialog::setAutoFlipMode);
 
-    _whiteClockLabel = new QLabel(this);
-    _blackClockLabel = new QLabel(this);
+    _board = makeOwned<ChessBoardWidget>(this);
+    _moveList = makeOwned<QListWidget>(this);
+    _moveList->setMinimumWidth(260);
 
-    auto *clocksRow = new QHBoxLayout;
+    _whiteClockLabel = makeOwned<QLabel>(this);
+    _blackClockLabel = makeOwned<QLabel>(this);
+
+    auto *clocksRow = makeLayout<QHBoxLayout>();
     clocksRow->setSpacing(10);
     clocksRow->addWidget(_whiteClockLabel, 1);
     clocksRow->addWidget(_blackClockLabel, 1);
 
-    _status = new QLabel(this);
+    _status = makeOwned<QLabel>(this);
     _status->setWordWrap(true);
 
-    _undoButton = new QPushButton("Отменить ход", this);
-    _resignButton = new QPushButton("Сдаться", this);
-    _drawButton = new QPushButton("Ничья", this);
-    auto *closeButton = new QPushButton("Закрыть", this);
+    _undoButton = makeOwned<QPushButton>(this, "Отменить ход");
+    _resignButton = makeOwned<QPushButton>(this, "Сдаться");
+    _drawButton = makeOwned<QPushButton>(this, "Ничья");
+    auto *closeButton = makeOwned<QPushButton>(this, "Закрыть");
 
-    _startButton = new QPushButton("|<", this);
-    _prevButton = new QPushButton("<", this);
-    _nextButton = new QPushButton(">", this);
-    _endButton = new QPushButton(">|", this);
+    _startButton = makeOwned<QPushButton>(this, "|<");
+    _prevButton = makeOwned<QPushButton>(this, "<");
+    _nextButton = makeOwned<QPushButton>(this, ">");
+    _endButton = makeOwned<QPushButton>(this, ">|");
 
-    auto *navLayout = new QHBoxLayout;
+    auto *navLayout = makeLayout<QHBoxLayout>();
     navLayout->setSpacing(8);
     navLayout->addWidget(_startButton);
     navLayout->addWidget(_prevButton);
     navLayout->addWidget(_nextButton);
     navLayout->addWidget(_endButton);
 
-    auto *right = new QVBoxLayout;
+    _autoPlayButton = makeOwned<QPushButton>(this, "Авто");
+    _intervalCombo = makeOwned<QComboBox>(this);
+    _intervalCombo->addItem("0.5 сек", 500);
+    _intervalCombo->addItem("1 сек", 1000);
+    _intervalCombo->addItem("1.5 сек", 1500);
+    _intervalCombo->addItem("2 сек", 2000);
+    _intervalCombo->setCurrentIndex(1);
+
+    auto *autoLayout = makeLayout<QHBoxLayout>();
+    autoLayout->setSpacing(8);
+    autoLayout->addWidget(_autoPlayButton, 1);
+    autoLayout->addWidget(makeOwned<QLabel>(this, "Интервал:"));
+    autoLayout->addWidget(_intervalCombo);
+
+    auto *right = makeLayout<QVBoxLayout>();
     right->setSpacing(10);
-    right->addWidget(new QLabel(QString("Контроль: %1").arg(controlLabel(_timeControl)), this));
+    right->addWidget(makeOwned<QLabel>(this, QString("Контроль: %1").arg(controlLabel(_timeControl))));
     right->addLayout(clocksRow);
-    right->addWidget(new QLabel("Ходы:", this));
+    right->addWidget(makeOwned<QLabel>(this, "Ходы:"));
     right->addWidget(_moveList, 1);
     right->addLayout(navLayout);
+    right->addLayout(autoLayout);
     right->addWidget(_status);
     right->addWidget(_undoButton);
     right->addWidget(_resignButton);
     right->addWidget(_drawButton);
     right->addWidget(closeButton);
 
-    auto *content = new QHBoxLayout;
+    auto *content = makeLayout<QHBoxLayout>();
     content->setSpacing(16);
     content->addWidget(_board, 3);
     content->addLayout(right, 1);
 
-    auto *root = new QVBoxLayout(this);
+    auto *root = makeLayout<QVBoxLayout>(this);
     root->setMenuBar(menuBar);
     root->addLayout(content);
 
-    _clockTimer = new QTimer(this);
+    _clockTimer = makeOwned<QTimer>(this);
     _clockTimer->setInterval(1000);
     connect(_clockTimer, &QTimer::timeout, this, &GameDialog::onClockTick);
+
+    _autoPlayTimer = makeOwned<QTimer>(this);
+    _autoPlayTimer->setInterval(_intervalCombo->currentData().toInt());
+    connect(_autoPlayTimer, &QTimer::timeout, this, &GameDialog::onAutoPlayTick);
 
     connect(_board, &ChessBoardWidget::squareClicked, this, &GameDialog::onSquareClicked);
     connect(_undoButton, &QPushButton::clicked, this, &GameDialog::undoMove);
@@ -222,6 +269,8 @@ QMenu::item:selected { background-color: #9f7e9e; color: #ffffff; }
     connect(_prevButton, &QPushButton::clicked, this, &GameDialog::stepBack);
     connect(_nextButton, &QPushButton::clicked, this, &GameDialog::stepForward);
     connect(_endButton, &QPushButton::clicked, this, &GameDialog::toEnd);
+    connect(_autoPlayButton, &QPushButton::clicked, this, &GameDialog::toggleAutoPlay);
+    connect(_intervalCombo, &QComboBox::currentIndexChanged, this, &GameDialog::onAutoIntervalChanged);
     connect(_moveList, &QListWidget::currentRowChanged, this, &GameDialog::onMoveActivated);
 
     refresh();
@@ -232,6 +281,77 @@ GameDialog::~GameDialog()
 {
     if (_clockTimer) {
         _clockTimer->stop();
+    }
+    stopAutoPlay();
+}
+
+void GameDialog::stopAutoPlay()
+{
+    _autoPlaying = false;
+    if (_autoPlayTimer && _autoPlayTimer->isActive()) {
+        _autoPlayTimer->stop();
+    }
+    if (_autoPlayButton) {
+        _autoPlayButton->setText("Авто");
+    }
+}
+
+void GameDialog::toggleAutoPlay()
+{
+    if (_editable || !_game) {
+        return;
+    }
+
+    if (_autoPlaying) {
+        stopAutoPlay();
+        return;
+    }
+
+    const int total = static_cast<int>(_game->history().size());
+    if (total == 0) {
+        return;
+    }
+
+    if (_ply >= total) {
+        _ply = 0;
+        refresh();
+    }
+
+    _autoPlaying = true;
+    _autoPlayButton->setText("Пауза");
+    if (_autoPlayTimer) {
+        _autoPlayTimer->setInterval(_intervalCombo ? _intervalCombo->currentData().toInt() : 1000);
+        _autoPlayTimer->start();
+    }
+}
+
+void GameDialog::onAutoPlayTick()
+{
+    if (_editable || !_game || !_autoPlaying) {
+        stopAutoPlay();
+        return;
+    }
+
+    const int total = static_cast<int>(_game->history().size());
+    if (_ply < total) {
+        ++_ply;
+        refresh();
+    }
+
+    if (_ply >= total) {
+        stopAutoPlay();
+    }
+}
+
+void GameDialog::onAutoIntervalChanged(int index)
+{
+    Q_UNUSED(index);
+    if (!_intervalCombo || !_autoPlayTimer) {
+        return;
+    }
+    const int ms = _intervalCombo->currentData().toInt();
+    if (ms > 0) {
+        _autoPlayTimer->setInterval(ms);
     }
 }
 
@@ -328,15 +448,31 @@ void GameDialog::rebuildView()
 
 void GameDialog::syncBoardOrientation()
 {
-    if (_autoFlip && _editable && _game && !_game->isOver()) {
-        _flipped = !_game->whiteToMove();
+    switch (_orientationMode) {
+    case OrientationMode::WhiteBottom:
+        _flipped = false;
+        break;
+    case OrientationMode::BlackBottom:
+        _flipped = true;
+        break;
+    case OrientationMode::AutoFlip:
+        if (_editable && _game && !_game->isOver()) {
+            _flipped = !_game->whiteToMove();
+        } else if (!_editable) {
+            _flipped = (_ply % 2) != 0;
+        } else {
+            _flipped = false;
+        }
+        break;
     }
 
-    if (_whiteAction && _blackAction) {
+    if (_whiteAction && _blackAction && _autoFlipAction) {
         QSignalBlocker b1(_whiteAction);
         QSignalBlocker b2(_blackAction);
-        _whiteAction->setChecked(!_flipped);
-        _blackAction->setChecked(_flipped);
+        QSignalBlocker b3(_autoFlipAction);
+        _whiteAction->setChecked(_orientationMode == OrientationMode::WhiteBottom);
+        _blackAction->setChecked(_orientationMode == OrientationMode::BlackBottom);
+        _autoFlipAction->setChecked(_orientationMode == OrientationMode::AutoFlip);
     }
 
     _board->setFlipped(_flipped);
@@ -392,7 +528,12 @@ void GameDialog::refresh()
         if (match && match->getResult().isPlayed()) {
             result = QString(" · результат: %1").arg(QString::fromStdString(match->getResult().toString()));
         }
-        _status->setText(QString("Просмотр: ход %1 из %2%3").arg(_ply).arg(history.size()).arg(result));
+        const QString autoTag = _autoPlaying ? " · автопросмотр" : QString();
+        _status->setText(QString("Просмотр: ход %1 из %2%3%4")
+                             .arg(_ply)
+                             .arg(history.size())
+                             .arg(result)
+                             .arg(autoTag));
     } else if (_game->isOver()) {
         _status->setText("Партия окончена.");
     } else {
@@ -419,16 +560,22 @@ void GameDialog::updateNavigation()
     }
 
     const int total = static_cast<int>(_game->history().size());
-    _startButton->setEnabled(_ply > 0);
-    _prevButton->setEnabled(_ply > 0);
-    _nextButton->setEnabled(_ply < total);
-    _endButton->setEnabled(_ply < total);
-
     const bool reviewButtons = !_editable;
+
+    _startButton->setEnabled(reviewButtons && _ply > 0);
+    _prevButton->setEnabled(reviewButtons && _ply > 0);
+    _nextButton->setEnabled(reviewButtons && _ply < total);
+    _endButton->setEnabled(reviewButtons && _ply < total);
+
     _startButton->setVisible(reviewButtons);
     _prevButton->setVisible(reviewButtons);
     _nextButton->setVisible(reviewButtons);
     _endButton->setVisible(reviewButtons);
+
+    _autoPlayButton->setVisible(reviewButtons);
+    _intervalCombo->setVisible(reviewButtons);
+    _autoPlayButton->setEnabled(reviewButtons && total > 0);
+    _intervalCombo->setEnabled(reviewButtons);
 }
 
 void GameDialog::clearSelection()
@@ -585,12 +732,14 @@ void GameDialog::drawAgree()
 
 void GameDialog::toStart()
 {
+    stopAutoPlay();
     _ply = 0;
     refresh();
 }
 
 void GameDialog::stepBack()
 {
+    stopAutoPlay();
     if (_ply > 0) {
         --_ply;
         refresh();
@@ -599,6 +748,7 @@ void GameDialog::stepBack()
 
 void GameDialog::stepForward()
 {
+    stopAutoPlay();
     if (_game && _ply < static_cast<int>(_game->history().size())) {
         ++_ply;
         refresh();
@@ -607,6 +757,7 @@ void GameDialog::stepForward()
 
 void GameDialog::toEnd()
 {
+    stopAutoPlay();
     if (_game) {
         _ply = static_cast<int>(_game->history().size());
         refresh();
@@ -619,20 +770,25 @@ void GameDialog::onMoveActivated(int row)
         return;
     }
 
+    stopAutoPlay();
     _ply = row + 1;
     refresh();
 }
 
-void GameDialog::orientWhiteBottom()
+void GameDialog::setWhiteBottomMode()
 {
-    _autoFlip = false;
-    _flipped = false;
+    _orientationMode = OrientationMode::WhiteBottom;
     syncBoardOrientation();
 }
 
-void GameDialog::orientBlackBottom()
+void GameDialog::setBlackBottomMode()
 {
-    _autoFlip = false;
-    _flipped = true;
+    _orientationMode = OrientationMode::BlackBottom;
+    syncBoardOrientation();
+}
+
+void GameDialog::setAutoFlipMode()
+{
+    _orientationMode = OrientationMode::AutoFlip;
     syncBoardOrientation();
 }

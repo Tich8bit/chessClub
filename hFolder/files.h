@@ -8,14 +8,11 @@
 
 class StorageManager {
 public:
-    // club.txt — состояние клуба (машиночитаемое).
     static void saveState(const std::string& filename, const ChessClub& club);
     static void loadState(const std::string& filename, ChessClub& club);
 
-    // journal.log — журнал действий (одна строка на операцию).
     static void logAction(const std::string& logFilename, const std::string& action);
 
-    // report.txt — отчёт для человека.
     static void generateReport(const std::string& reportFilename, const ChessClub& club);
 
 private:
@@ -27,7 +24,7 @@ private:
     static void loadCoach(std::ifstream& ifs, ChessClub& club, bool withArchive);
     static void loadTournament(std::ifstream& ifs, ChessClub& club, bool withParticipants);
     static void loadTraining(std::ifstream& ifs, ChessClub& club);
-    static void loadMatch(std::ifstream& ifs, ChessClub& club, bool withTournamentId, bool withMoves);
+    static int loadMatch(std::ifstream& ifs, ChessClub& club, bool withTournamentId, bool withMoves, int prevMatchId);
 
     static void reportPlayers(std::ofstream& ofs, const ChessClub& club);
     static void reportEvents(std::ofstream& ofs, const ChessClub& club);

@@ -5,8 +5,11 @@
 #include <chrono>
 #include <ctime>
 #include <format>
+#include <iomanip>
 #include <iostream>
+#include <memory>
 #include <sstream>
+#include <vector>
 
 #include "chessgame.h"
 #include "coach.h"
@@ -141,7 +144,10 @@ void StorageManager::loadState(const std::string& filename, ChessClub& club) {
 
     int matchesCount = 0;
     ifs >> matchesCount;
-    for (int i = 0; i < matchesCount; ++i) loadMatch(ifs, club, withExtras, withMoves);
+    int lastMatchId = -1;
+    for (int i = 0; i < matchesCount; ++i) {
+        lastMatchId = loadMatch(ifs, club, withExtras, withMoves, lastMatchId);
+    }
 
     if (!ifs) throw InvalidDataException("файл повреждён: неожиданный конец данных");
 
@@ -245,32 +251,52 @@ void StorageManager::loadTraining(std::ifstream& ifs, ChessClub& club) {
     club.addEvent(std::make_shared<TrainingSession>(id, title, topic, durationMinutes, coach));
 }
 
-void StorageManager::loadMatch(std::ifstream& ifs, ChessClub& club, bool withTournamentId, bool withMoves) {
-    std::string prefix, dateStr;
-    int id, whiteId, blackId, resultInt;
+int StorageManager::loadMatch(std::ifstream& ifs, ChessClub& club, bool withTournamentId, bool withMoves, int prevMatchId) {
+    const std::string afterInfo = prevMatchId >= 0
+        ? " (после партии ID=" + std::to_string(prevMatchId) + ")"
+        : " (в начале блока партий)";
 
-    if (!(ifs >> prefix >> id >> whiteId >> blackId >> std::quoted(dateStr) >> resultInt)) {
-        throw InvalidDataException("ошибка чтения партии");
+    std::string firstToken;
+    if (!(ifs >> firstToken)) {
+        throw InvalidDataException("ошибка чтения партии: нет токена" + afterInfo);
     }
-    if (prefix != PREFIX_MATCH) throw InvalidDataException("неверный префикс партии");
+
+    int id = -1;
+    if (firstToken == PREFIX_MATCH || firstToken == "MATCH") {
+        if (!(ifs >> id)) {
+            throw InvalidDataException("ошибка чтения ID партии после префикса" + afterInfo);
+        }
+    } else {
+        try {
+            id = std::stoi(firstToken);
+        } catch (...) {
+            throw InvalidDataException("ожидался префикс или ID партии, получено '" + firstToken + "'" + afterInfo);
+        }
+    }
+
+    std::string dateStr;
+    int whiteId = -1, blackId = -1, resultInt = 0;
+    if (!(ifs >> whiteId >> blackId >> std::quoted(dateStr) >> resultInt)) {
+        throw InvalidDataException("ошибка чтения полей партии ID=" + std::to_string(id) + afterInfo);
+    }
 
     int tournamentId = -1;
     if (withTournamentId && !(ifs >> tournamentId)) {
-        throw InvalidDataException("ошибка чтения турнира партии");
+        throw InvalidDataException("ошибка чтения турнира партии ID=" + std::to_string(id) + afterInfo);
     }
 
     std::vector<std::string> moves;
     if (withMoves) {
-        size_t movesCount = 0;
-        if (!(ifs >> movesCount)) {
-            throw InvalidDataException("ошибка чтения количества ходов");
+        size_t declaredMovesCount = 0;
+        if (!(ifs >> declaredMovesCount)) {
+            throw InvalidDataException("ошибка чтения количества ходов партии ID=" + std::to_string(id) + afterInfo);
         }
-        moves.reserve(movesCount);
-        for (size_t i = 0; i < movesCount; ++i) {
-            std::string uci;
-            if (!(ifs >> uci)) {
-                throw InvalidDataException("ошибка чтения хода");
-            }
+
+        std::string tailLine;
+        std::getline(ifs, tailLine);
+        std::istringstream tailStream(tailLine);
+        std::string uci;
+        while (tailStream >> uci) {
             moves.push_back(uci);
         }
     }
@@ -287,7 +313,7 @@ void StorageManager::loadMatch(std::ifstream& ifs, ChessClub& club, bool withTou
         }
         date = DateTime(d, m, y, h, min, s);
     } else {
-        throw InvalidDataException("неверный формат даты в файле: " + dateStr);
+        throw InvalidDataException("неверный формат даты в файле: " + dateStr + " (партия ID=" + std::to_string(id) + ")");
     }
 
     auto whiteMember = club.findPlayerById(whiteId);
@@ -295,7 +321,7 @@ void StorageManager::loadMatch(std::ifstream& ifs, ChessClub& club, bool withTou
     auto white = std::dynamic_pointer_cast<Player>(whiteMember);
     auto black = std::dynamic_pointer_cast<Player>(blackMember);
 
-    if (!white || !black) throw RelationException("участник не является игроком");
+    if (!white || !black) throw RelationException("участник не является игроком (партия ID=" + std::to_string(id) + ")");
 
     auto match = std::make_shared<Match>(id, white, black, date);
     match->setResult(static_cast<MatchResult::Result>(resultInt));
@@ -319,6 +345,8 @@ void StorageManager::loadMatch(std::ifstream& ifs, ChessClub& club, bool withTou
             *tournament += match;
         }
     }
+
+    return id;
 }
 
 void StorageManager::generateReport(const std::string& reportFilename, const ChessClub& club) {

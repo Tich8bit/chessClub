@@ -11,18 +11,23 @@ class ChessClub;
 class ChessBoardWidget;
 class ChessGame;
 class QAction;
+class QComboBox;
 class QLabel;
 class QListWidget;
 class QPushButton;
 class QTimer;
 
-// Окно партии: доска, список ходов, часы и управление.
-// Если партия не завершена — можно ходить; если завершена — только просмотр.
 class GameDialog : public QDialog
 {
     Q_OBJECT
 
 public:
+    enum class OrientationMode {
+        WhiteBottom,
+        BlackBottom,
+        AutoFlip
+    };
+
     GameDialog(ChessClub *club,
                int matchId,
                Tournament::TimeControl timeControl = Tournament::TimeControl::Rapid,
@@ -40,10 +45,14 @@ private slots:
     void stepBack();
     void stepForward();
     void toEnd();
+    void toggleAutoPlay();
+    void onAutoPlayTick();
+    void onAutoIntervalChanged(int index);
 
     void onMoveActivated(int row);
-    void orientWhiteBottom();
-    void orientBlackBottom();
+    void setWhiteBottomMode();
+    void setBlackBottomMode();
+    void setAutoFlipMode();
 
 private:
     static int initialSecondsForControl(Tournament::TimeControl control);
@@ -54,6 +63,7 @@ private:
     void refresh();
     void updateClocks();
     void syncClockTimer();
+    void stopAutoPlay();
     void clearSelection();
     QString askPromotion() const;
     void updateNavigation();
@@ -63,7 +73,7 @@ private:
     Tournament::TimeControl _timeControl = Tournament::TimeControl::Rapid;
     bool _editable = false;
     bool _flipped = false;
-    bool _autoFlip = true;
+    OrientationMode _orientationMode = OrientationMode::WhiteBottom;
     int _ply = 0;
 
     int _whiteSecondsLeft = 600;
@@ -71,11 +81,15 @@ private:
     bool _flagged = false;
     QTimer *_clockTimer = nullptr;
 
-    std::shared_ptr<ChessGame> _game;      // настоящая партия
-    std::shared_ptr<ChessGame> _viewGame;  // позиция для показа
+    QTimer *_autoPlayTimer = nullptr;
+    bool _autoPlaying = false;
+
+    std::shared_ptr<ChessGame> _game;
+    std::shared_ptr<ChessGame> _viewGame;
 
     QAction *_whiteAction = nullptr;
     QAction *_blackAction = nullptr;
+    QAction *_autoFlipAction = nullptr;
 
     ChessBoardWidget *_board = nullptr;
     QListWidget *_moveList = nullptr;
@@ -89,6 +103,8 @@ private:
     QPushButton *_prevButton = nullptr;
     QPushButton *_nextButton = nullptr;
     QPushButton *_endButton = nullptr;
+    QPushButton *_autoPlayButton = nullptr;
+    QComboBox *_intervalCombo = nullptr;
 
     int _selected = -1;
     QSet<int> _targets;

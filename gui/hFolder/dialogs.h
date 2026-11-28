@@ -71,8 +71,8 @@ public:
     explicit AddTournamentDialog(QWidget *parent = nullptr);
 
     QString title;
-    int timeControl = 2;   // 0 блиц, 1 рапид, 2 классика
-    int system = 0;        // 0 круговая, 1 швейцарская, 2 плей-офф
+    int timeControl = 2;
+    int system = 0;
     int maxPlayers = 8;
 
 protected:
@@ -96,6 +96,9 @@ public:
     QDate date = QDate::currentDate();
     QTime time = QTime::currentTime();
 
+protected:
+    void accept() override;
+
 private:
     QSpinBox *m_tournamentId = nullptr;
     QSpinBox *m_whiteId = nullptr;
@@ -109,7 +112,6 @@ class ResultDialog : public QDialog
 public:
     explicit ResultDialog(QWidget *parent = nullptr);
 
-    // 0 — ничья, 1 — победа белых, 2 — победа чёрных.
     int result = 0;
 
 private:
