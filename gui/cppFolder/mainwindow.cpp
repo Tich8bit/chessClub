@@ -21,6 +21,7 @@
 #include <QMap>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QPalette>
 #include <QPushButton>
 #include <QSortFilterProxyModel>
 #include <QSpinBox>
@@ -121,6 +122,19 @@ QString filePath(const char *name)
     return QDir(stateDirectory()).filePath(QString::fromUtf8(name));
 }
 
+void applyFixedColumnWidths(QTableView *view, const QVector<int> &widths)
+{
+    if (!view || !view->horizontalHeader()) {
+        return;
+    }
+    auto *header = view->horizontalHeader();
+    header->setStretchLastSection(false);
+    for (int col = 0; col < widths.size(); ++col) {
+        header->setSectionResizeMode(col, QHeaderView::Fixed);
+        view->setColumnWidth(col, widths[col]);
+    }
+}
+
 void createTestClub(ChessClub &club)
 {
     auto p1 = std::make_shared<Player>(1, "Иван", "Иванов", "Иванович", Ratings(1200, 1250, 1300), 0, 0, 0);
@@ -158,7 +172,7 @@ MainWindow::MainWindow(const QString &clubName, QWidget *parent)
     , _club(std::make_unique<ChessClub>(clubName.toStdString()))
 {
     setWindowTitle(clubName.isEmpty() ? QStringLiteral("chessClub") : clubName);
-    resize(1120, 680);
+    resize(1160, 680);
 
     buildUi();
     applyBlueTheme();
@@ -373,6 +387,7 @@ void MainWindow::buildUi()
     {
         auto *page = buildTableTab(_playersTab,
             {"ID", "ФИО", "Классика", "Рапид", "Блиц", "В", "Н", "П"});
+        applyFixedColumnWidths(_playersTab.view, {65, 250, 105, 105, 105, 65, 65, 65});
 
         auto *add = new QPushButton("Добавить", page);
         auto *remove = new QPushButton("Удалить", page);
@@ -388,7 +403,8 @@ void MainWindow::buildUi()
 
     {
         auto *page = buildTableTab(_coachesTab,
-            {"ID", "ФИО", "Классика", "Рапид", "Блиц", "Стаж", "Специализация"});
+            {"ID", "ФИО", "Классика", "Рапид", "Блиц", "Стаж", "Специализация", "Квалификация"});
+        applyFixedColumnWidths(_coachesTab.view, {65, 230, 100, 100, 100, 80, 165, 125});
 
         auto *add = new QPushButton("Добавить", page);
         auto *remove = new QPushButton("Удалить", page);
@@ -403,6 +419,7 @@ void MainWindow::buildUi()
     {
         auto *page = buildTableTab(_tournamentsTab,
             {"ID", "Название", "Контроль", "Система", "Участники", "Лимит", "Партии", "Статус"});
+        applyFixedColumnWidths(_tournamentsTab.view, {65, 220, 110, 140, 105, 85, 85, 120});
 
         auto *add = new QPushButton("Добавить", page);
         auto *info = new QPushButton("Инфо", page);
@@ -423,6 +440,7 @@ void MainWindow::buildUi()
     {
         auto *page = buildTableTab(_trainingsTab,
             {"ID", "Название", "Тема и время", "Тренер", "Длительность (мин)", "Участники", "Статус"});
+        applyFixedColumnWidths(_trainingsTab.view, {65, 195, 250, 210, 165, 105, 145});
 
         auto *add = new QPushButton("Добавить", page);
         auto *info = new QPushButton("Инфо", page);
@@ -445,6 +463,7 @@ void MainWindow::buildUi()
     {
         auto *page = buildTableTab(_matchesTab,
             {"ID", "Белые", "Чёрные", "Дата", "Статус", "Турнир"}, true);
+        applyFixedColumnWidths(_matchesTab.view, {65, 225, 225, 175, 185, 95});
 
         auto *play = new QPushButton("Играть", page);
         auto *add = new QPushButton("Создать", page);
@@ -479,7 +498,7 @@ QWidget *MainWindow::buildTableTab(Tab &tab, const QStringList &headers, bool wi
     tab.view->setSelectionMode(QAbstractItemView::SingleSelection);
     tab.view->setEditTriggers(QAbstractItemView::NoEditTriggers);
     tab.view->verticalHeader()->setVisible(false);
-    tab.view->horizontalHeader()->setStretchLastSection(true);
+    tab.view->horizontalHeader()->setStretchLastSection(false);
 
     tab.filter = new QLineEdit;
     tab.filter->setPlaceholderText("Фильтр по таблице...");
@@ -519,9 +538,6 @@ QWidget *MainWindow::buildTableTab(Tab &tab, const QStringList &headers, bool wi
     connect(tab.filter, &QLineEdit::textChanged, this, [tabPtr](const QString &text) {
         tabPtr->proxy->setFilterFixedString(text);
     });
-
-    connect(tab.view->horizontalHeader(), &QHeaderView::sectionDoubleClicked, this,
-            [tabPtr](int column) { tabPtr->view->resizeColumnToContents(column); });
 
     return page;
 }
@@ -623,6 +639,7 @@ void MainWindow::refreshPlayers()
 
     _playersTab.model->resetRows(
         {"ID", "ФИО", "Классика", "Рапид", "Блиц", "В", "Н", "П"}, rows);
+    applyFixedColumnWidths(_playersTab.view, {65, 250, 105, 105, 105, 65, 65, 65});
 }
 
 void MainWindow::refreshCoaches()
@@ -645,7 +662,8 @@ void MainWindow::refreshCoaches()
             QString::number(coach->getRatings().getRapid()),
             QString::number(coach->getRatings().getBlitz()),
             QString::number(coach->getExperienceYears()),
-            QString::fromStdString(coach->getSpecialization().toString())
+            QString::fromStdString(coach->getSpecialization().toString()),
+            QString::number(coach->getQualificationLevel())
         };
         row.values = {
             coach->getId(),
@@ -654,13 +672,15 @@ void MainWindow::refreshCoaches()
             coach->getRatings().getRapid(),
             coach->getRatings().getBlitz(),
             coach->getExperienceYears(),
-            QString::fromStdString(coach->getSpecialization().toString())
+            QString::fromStdString(coach->getSpecialization().toString()),
+            coach->getQualificationLevel()
         };
         rows.push_back(row);
     }
 
     _coachesTab.model->resetRows(
-        {"ID", "ФИО", "Классика", "Рапид", "Блиц", "Стаж", "Специализация"}, rows);
+        {"ID", "ФИО", "Классика", "Рапид", "Блиц", "Стаж", "Специализация", "Квалификация"}, rows);
+    applyFixedColumnWidths(_coachesTab.view, {65, 230, 100, 100, 100, 80, 165, 125});
 }
 
 void MainWindow::refreshTournaments()
@@ -704,6 +724,7 @@ void MainWindow::refreshTournaments()
 
     _tournamentsTab.model->resetRows(
         {"ID", "Название", "Контроль", "Система", "Участники", "Лимит", "Партии", "Статус"}, rows);
+    applyFixedColumnWidths(_tournamentsTab.view, {65, 220, 110, 140, 105, 85, 85, 120});
 }
 
 void MainWindow::refreshTrainings()
@@ -747,6 +768,7 @@ void MainWindow::refreshTrainings()
 
     _trainingsTab.model->resetRows(
         {"ID", "Название", "Тема и время", "Тренер", "Длительность (мин)", "Участники", "Статус"}, rows);
+    applyFixedColumnWidths(_trainingsTab.view, {65, 195, 250, 210, 165, 105, 145});
 }
 
 void MainWindow::refreshMatches()
@@ -826,6 +848,7 @@ void MainWindow::refreshMatches()
 
     _matchesTab.model->resetRows(
         {"ID", "Белые", "Чёрные", "Дата", "Статус", "Турнир"}, rows);
+    applyFixedColumnWidths(_matchesTab.view, {65, 225, 225, 175, 185, 95});
 }
 
 int MainWindow::selectedId(const Tab &tab) const
@@ -1338,7 +1361,7 @@ void MainWindow::showTournamentInfo()
     standingsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     standingsTable->setSelectionMode(QAbstractItemView::SingleSelection);
     standingsTable->verticalHeader()->setVisible(false);
-    standingsTable->horizontalHeader()->setStretchLastSection(true);
+    standingsTable->horizontalHeader()->setStretchLastSection(false);
     resultsLayout->addWidget(standingsTable);
     subTabs->addTab(resultsPage, "Результаты");
 
@@ -1351,7 +1374,7 @@ void MainWindow::showTournamentInfo()
     matchesTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     matchesTable->setSelectionMode(QAbstractItemView::SingleSelection);
     matchesTable->verticalHeader()->setVisible(false);
-    matchesTable->horizontalHeader()->setStretchLastSection(true);
+    matchesTable->horizontalHeader()->setStretchLastSection(false);
     matchesLayout->addWidget(matchesTable, 1);
 
     auto *matchesBtnRow = new QHBoxLayout;
@@ -1374,7 +1397,7 @@ void MainWindow::showTournamentInfo()
     playersTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     playersTable->setSelectionMode(QAbstractItemView::SingleSelection);
     playersTable->verticalHeader()->setVisible(false);
-    playersTable->horizontalHeader()->setStretchLastSection(true);
+    playersTable->horizontalHeader()->setStretchLastSection(false);
     playersLayout->addWidget(playersTable, 1);
 
     auto *playersBtnRow = new QHBoxLayout;
@@ -1448,7 +1471,11 @@ void MainWindow::showTournamentInfo()
                                                   .arg(entry.draws)
                                                   .arg(entry.losses)));
         }
-        standingsTable->resizeColumnsToContents();
+        const QVector<int> standingsWidths = {80, 260, 110, 90, 120};
+        for (int c = 0; c < standingsWidths.size(); ++c) {
+            standingsTable->horizontalHeader()->setSectionResizeMode(c, QHeaderView::Fixed);
+            standingsTable->setColumnWidth(c, standingsWidths[c]);
+        }
 
         matchesTable->setRowCount(totalMatches);
         int matchRow = 0;
@@ -1478,7 +1505,11 @@ void MainWindow::showTournamentInfo()
         if (totalMatches > 0 && matchesTable->currentRow() < 0) {
             matchesTable->setCurrentCell(0, 0);
         }
-        matchesTable->resizeColumnsToContents();
+        const QVector<int> tMatchWidths = {60, 165, 190, 190, 140, 115};
+        for (int c = 0; c < tMatchWidths.size(); ++c) {
+            matchesTable->horizontalHeader()->setSectionResizeMode(c, QHeaderView::Fixed);
+            matchesTable->setColumnWidth(c, tMatchWidths[c]);
+        }
 
         playersTable->setRowCount(enrolledPlayersCount);
 
@@ -1497,7 +1528,11 @@ void MainWindow::showTournamentInfo()
             playersTable->setItem(playerRow, 2, new QTableWidgetItem(QString::number(rating)));
             ++playerRow;
         }
-        playersTable->resizeColumnsToContents();
+        const QVector<int> tPlayerWidths = {75, 310, 165};
+        for (int c = 0; c < tPlayerWidths.size(); ++c) {
+            playersTable->horizontalHeader()->setSectionResizeMode(c, QHeaderView::Fixed);
+            playersTable->setColumnWidth(c, tPlayerWidths[c]);
+        }
     };
 
     reloadTournamentView();
@@ -2257,7 +2292,7 @@ void MainWindow::showTrainingDetails()
     playersTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     playersTable->setSelectionMode(QAbstractItemView::SingleSelection);
     playersTable->verticalHeader()->setVisible(false);
-    playersTable->horizontalHeader()->setStretchLastSection(true);
+    playersTable->horizontalHeader()->setStretchLastSection(false);
     playersLayout->addWidget(playersTable, 1);
 
     auto *playersBtnRow = new QHBoxLayout;
@@ -2318,7 +2353,11 @@ void MainWindow::showTrainingDetails()
             playersTable->setItem(row, 2, new QTableWidgetItem(QString::number(rating)));
             ++row;
         }
-        playersTable->resizeColumnsToContents();
+        const QVector<int> trPlayerWidths = {75, 290, 165};
+        for (int c = 0; c < trPlayerWidths.size(); ++c) {
+            playersTable->horizontalHeader()->setSectionResizeMode(c, QHeaderView::Fixed);
+            playersTable->setColumnWidth(c, trPlayerWidths[c]);
+        }
 
         QString detailsText = QString("Название: %1 (ID %2)\n"
                                        "Статус: %3\n"
@@ -2680,17 +2719,32 @@ void MainWindow::viewLog()
 
 void MainWindow::applyBlueTheme()
 {
+    QPalette pal = qApp->palette();
+    const QColor highlightBg("#744f76");
+    const QColor highlightFg("#ffffff");
+    pal.setColor(QPalette::Highlight, highlightBg);
+    pal.setColor(QPalette::HighlightedText, highlightFg);
+    qApp->setPalette(pal);
+
     // Цветовая схема в стиле серо-сиреневого / пыльно-лавандового референса.
     const QString style = R"(
 QWidget { background-color: #2e303a; color: #f2f1f7; font-size: 13px; }
 QMainWindow, QDialog, QMessageBox { background-color: #2e303a; }
-QTableView {
+QTableView, QTableWidget {
     background-color: #383b48;
     gridline-color: #525669;
-    selection-background-color: #b694b4;
-    selection-color: #23242c;
+    selection-background-color: #744f76;
+    selection-color: #ffffff;
     border: 1px solid #525669;
     border-radius: 10px;
+}
+QTableView::item:selected, QTableWidget::item:selected {
+    background-color: #744f76;
+    color: #ffffff;
+}
+QTableView::item:selected:!active, QTableWidget::item:selected:!active {
+    background-color: #5d3f5f;
+    color: #f7f6fb;
 }
 QHeaderView::section {
     background-color: #454858;
@@ -2709,6 +2763,10 @@ QLineEdit, QSpinBox, QComboBox, QDateEdit, QTimeEdit, QListWidget {
 }
 QLineEdit:focus, QSpinBox:focus, QComboBox:focus, QDateEdit:focus, QTimeEdit:focus, QListWidget:focus {
     border-color: #c9a8c7;
+}
+QListWidget::item:selected {
+    background-color: #744f76;
+    color: #ffffff;
 }
 QPushButton {
     background-color: #9f7e9e;
